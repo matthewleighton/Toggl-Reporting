@@ -4,9 +4,25 @@ import re
 minutesInDay = 60*24
 day = {}
 
+emptyDay = {}
 #Populate day variable with empty minutes
 for i in range (0, minutesInDay+1):
-	day[i] = 0
+	emptyDay[i] = 0
+
+projectList = [
+	'Physics',
+	'Maths',
+	'Reading',
+	'Film/TV',
+	'Coding',
+	'Real Life Social',
+	'Online Social',
+	'Video Games',
+	#'Total'
+]
+
+for project in projectList:
+	day[project] = emptyDay.copy()
 
 
 def getTimeInMinutes(time):
@@ -22,6 +38,12 @@ def getTimeInMinutes(time):
 
 	return 0
 
+def isValidProject(project):
+	if project in projectList:
+		return True
+	
+	return False
+
 
 with open ('report.csv', 'r') as file:
 	reader = csv.DictReader(file)
@@ -30,6 +52,11 @@ with open ('report.csv', 'r') as file:
 		duration = getTimeInMinutes(row['Duration'])
 
 		project = row['Project']
+
+		if not isValidProject(project):
+			continue
+	
+
 
 
 		#if not project in day.keys():
@@ -47,14 +74,20 @@ with open ('report.csv', 'r') as file:
 			if targetMinute >= 1440:
 				targetMinute = abs(1440-i)
 
-			day[targetMinute] += 1
+			day[project][targetMinute] += 1
+			#day['Total'][targetMinute] += 1
 	
-del day[1440] # Remove this because otherwise we're considering midnight twice.
+#for prject in day:
+	#del day[project][1440]# Remove this because otherwise we're considering midnight twice.
+
+
+
 
 import matplotlib.pyplot as plt
 
 
-plt.plot(list(day.keys()), list(day.values()), label="Total")
+for project in projectList:
+	plt.plot(list(day[project].keys()), list(day[project].values()), label=project)
 
 
 plt.ylabel('Frequency')
@@ -76,5 +109,6 @@ plt.xticks(positions, labels)
 
 plt.grid()
 
+plt.legend()
 
 plt.show()
