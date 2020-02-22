@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from tkinter import *
 from tkcalendar import Calendar, DateEntry
 from toggl.TogglPy import Toggl
 
@@ -26,40 +27,54 @@ class TogglReportingApp(tk.Tk):
 
 		self.frames = {}
 
-		frame = StartPage(container, self)
-		self.frames[StartPage] = frame
-		frame.grid(row=0, column=0, sticky="nsew")
+		self.connect_to_toggl()
 
-
-		"""
-		for F in (StartPage):
+		for F in (StartPage, ProjectsPage):
 			frame = F(container, self)
 
 			self.frames[F] = frame
 
 			frame.grid(row=0, column=0, sticky="nsew")
-		"""
 
 		self.show_frame(StartPage)
 
-		self.projectList = ['Film/TV', 'Maths', 'Reading', 'Real Life Social', 'Physics']
+		self.projectList = ['Film/TV', 'Maths', 'Reading', 'Real Life Social', 'Physics', 'Coding', 'Johanna']
+
+		
 
 	def show_frame(self, cont):
 		frame=self.frames[cont]
 		frame.tkraise()
 
+
+	def connect_to_toggl(self):
+		self.toggl = Toggl()
+		self.toggl.setAPIKey(config.API_KEY)
+		
+		self.user_data = self.toggl.request("https://www.toggl.com/api/v8/me?with_related_data=true")
+
+		project_data = self.user_data['data']['projects']
+
+		projects = {}
+
+		for p in project_data:
+			project_name = p['name']
+
+			projects[project_name] = {
+				'color': p['color'],
+				'status': True
+			}
+
+		self.projects = projects
+
 	def get_report(self, params):
-
-		toggl = Toggl()
-		toggl.setAPIKey(config.API_KEY)
-
 		data = {
 		    'workspace_id': config.WORKSPACE_ID,
 		    'since': params['start'],
 		    'until': params['end'],
 		}
 
-		toggl.getDetailedReportCSV(data, "report.csv")
+		self.toggl.getDetailedReportCSV(data, "report.csv")
 
 	def getTimeInMinutes(self, time):
 		split = re.split(':', time)
@@ -128,6 +143,8 @@ class TogglReportingApp(tk.Tk):
 		return day
 
 	def main_sequence(self, params):
+		self.connect_to_toggl()
+
 		day = self.get_day()
 
 		day = self.populate_day(day)
@@ -180,12 +197,23 @@ class StartPage(tk.Frame):
 		end_select = DateEntry(self)
 		end_select.grid(row=1, column=1, padx=10, pady=10)
 
+		select_projects_button = ttk.Button(self, text="Projects",
+								command=lambda: controller.show_frame(ProjectsPage))
+		select_projects_button.grid(row=0, column=2, padx=10, pady=10)
+
+
+
 		create_graph_button = ttk.Button(self, text="Create Graph",
 							command=self.confirm_date_selection)
 		create_graph_button.grid(row=2, column=0, padx=10, pady=10)
 
+
+
 		self.start_select = start_select
 		self.end_select = end_select
+
+	def select_projects(self):
+		app.select_project()
 
 	def confirm_date_selection(self):
 
@@ -198,8 +226,29 @@ class StartPage(tk.Frame):
 
 		app.main_sequence(params)
 
+class ProjectsPage(tk.Frame):
+	def __init__(self, parent, controller):
+		tk.Frame.__init__(self, parent)
+
+		projects = controller.projects
+
+		self.listbox = Listbox(self, selectmode=EXTENDED)
+
+		for p in projects:
+			self.listbox.insert(END, p)
+
+		self.listbox.pack()
 
 
+		confirm_projects_button = Button(self, text="Confirm", command=lambda: self.confirm_project_selection(controller))
+		confirm_projects_button.pack()
+
+	def confirm_project_selection(self, controller):
+		chosen_projects = [self.listbox.get(idx) for idx in self.listbox.curselection()]
+
+		controller.projectList = chosen_projects
+
+		controller.show_frame(StartPage)
 
 app = TogglReportingApp()
 
