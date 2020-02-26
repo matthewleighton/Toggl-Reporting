@@ -1,8 +1,18 @@
+"""
+#To Do List:
+- Ability to show data across time span longer than 1 year. (Stitch multiple reports together).
+- Add title to graph, showing timespan.
+- Improve the way that project selection is displayed. Maybe list most tracked projects at top?
+"""
+
+
 import tkinter as tk
 from tkinter import ttk
 from tkinter import *
 from tkcalendar import Calendar, DateEntry
 from toggl.TogglPy import Toggl
+
+from datetime import datetime, timedelta
 
 import csv
 import re
@@ -13,6 +23,7 @@ import config
 
 LARGE_FONT = ("Verdana", 12)
 
+# TogglReportingApp Class -------------------------------------------------------------------------------------------
 class TogglReportingApp(tk.Tk):
 
 	def __init__(self, *args, **kwargs):
@@ -45,7 +56,6 @@ class TogglReportingApp(tk.Tk):
 	def show_frame(self, cont):
 		frame=self.frames[cont]
 		frame.tkraise()
-
 
 	def connect_to_toggl(self):
 		self.toggl = Toggl()
@@ -118,14 +128,6 @@ class TogglReportingApp(tk.Tk):
 
 				if not self.isValidProject(project):
 					continue
-			
-				#if not project in day.keys():
-					#day[project] = {}
-
-				#print(day)
-
-				#if not project == 'Online Social':
-				#	continue
 
 				for i in range (startMinutes+1, startMinutes+duration+1):
 					
@@ -135,11 +137,7 @@ class TogglReportingApp(tk.Tk):
 						targetMinute = abs(1440-i)
 
 					day[project][targetMinute] += 1
-					#day['Total'][targetMinute] += 1
 			
-		#for project in day:
-			#del day[project][1440]# Remove this because otherwise we're considering midnight twice.
-
 		return day
 
 	def main_sequence(self, params):
@@ -179,60 +177,125 @@ class TogglReportingApp(tk.Tk):
 
 		plt.show()
 
-
+# StartPage Class -------------------------------------------------------------------------------------------
 class StartPage(tk.Frame):
 
 	def __init__(self, parent, controller):
 		tk.Frame.__init__(self, parent)
 
-		start_label = ttk.Label(self, text="Start Date:")
-		start_label.grid(row=0, column=0, padx=10, pady=10)
+		self.define_preset_date_bounds()
 
-		start_select = DateEntry(self)
-		start_select.grid(row=0, column=1, padx=10, pady=10)
+		self.create_custom_time_input()
 
-		end_label = ttk.Label(self, text="End Date:")
-		end_label.grid(row=1, column=0, padx=10, pady=10)
-
-		end_select = DateEntry(self)
-		end_select.grid(row=1, column=1, padx=10, pady=10)
-
+		self.create_time_frame_select()
+		
 		select_projects_button = ttk.Button(self, text="Projects",
 								command=lambda: controller.show_frame(ProjectsPage))
-		select_projects_button.grid(row=0, column=2, padx=10, pady=10)
-
-
+		select_projects_button.grid(row=0, column=1, padx=10, pady=10)
 
 		create_graph_button = ttk.Button(self, text="Create Graph",
 							command=self.confirm_date_selection)
 		create_graph_button.grid(row=2, column=0, padx=10, pady=10)
 
+	def define_preset_date_bounds(self):
+		year = 365
 
+		self.preset_date_bouds = {
+			'Past week': 7,
+			'Past Month': 30,
+			'Past year': year,
+			'Past 2 years': year*2,
+			'Past 5 years': year*5,
+			'Custom':0
+		}
 
-		self.start_select = start_select
-		self.end_select = end_select
+	def create_custom_time_input(self):
+		self.custom_time_input_frame = LabelFrame(self, text="Custom Time Frame", padx=10, pady=10)
+
+		self.start_label = ttk.Label(self.custom_time_input_frame, text="Start Date:")
+		self.start_label.grid(row=0, column=0, padx=10, pady=10)
+
+		self.start_select = DateEntry(self.custom_time_input_frame)
+		self.start_select.grid(row=0, column=1, padx=10, pady=10)
+
+		self.end_label = ttk.Label(self.custom_time_input_frame, text="End Date:")
+		self.end_label.grid(row=1, column=0, padx=10, pady=10)
+
+		self.end_select = DateEntry(self.custom_time_input_frame)
+		self.end_select.grid(row=1, column=1, padx=10, pady=10)
+
+	def create_time_frame_select(self):
+		time_frame_label = ttk.Label(self, text="Time Frame:")
+		time_frame_label.grid(row=1, column=0, padx=10, pady=10)
+
+		self.time_frame_select = Listbox(self, selectmode=SINGLE)
+
+		for i in self.preset_date_bouds:
+			self.time_frame_select.insert(END, i)
+
+		self.time_frame_select.bind('<<ListboxSelect>>', self.check_time_frame_select_value)
+
+		self.time_frame_select.grid(row=1, column=1, padx=10, pady=10)
+
+	def check_time_frame_select_value(self, callback_value):
+		custom_selected = self.using_custom_date_bounds()
+		self.toggle_custom_date_input(custom_selected)
+
+	def using_custom_date_bounds(self):
+		return self.time_frame_select.select_includes(END)
+	
+	# Hide/show the custom date input box	
+	def toggle_custom_date_input(self, value):
+		if value == True:
+			self.custom_time_input_frame.grid(row=1, column=2, padx=10, pady=10)
+		else:
+			self.custom_time_input_frame.grid_forget()
+		
 
 	def select_projects(self):
 		app.select_project()
 
+	# Return the start and end date for the bounds that the user has selected.
+	def get_date_bounds(self):
+		if self.using_custom_date_bounds():
+			dates = {
+				'start': self.start_select.get_date(),
+				'end': self.end_select.get_date()
+			}
+		else:
+			string_selected = self.time_frame_select.get(self.time_frame_select.curselection())
+			day_count = self.preset_date_bouds[string_selected]
+
+			dates = {
+				'start': datetime.now() - timedelta(days=day_count),
+				'end': datetime.now()
+			}
+
+		return dates
+
+
+
 	def confirm_date_selection(self):
 
+		date_bounds = self.get_date_bounds()
+
 		params = {
-			'start': self.start_select.get_date(),
-			'end': self.end_select.get_date()
+			'start': date_bounds['start'],
+			'end': date_bounds['end']
 		}
 
 		app.get_report(params)
 
 		app.main_sequence(params)
 
+# ProjectsPage Class -------------------------------------------------------------------------------------------
 class ProjectsPage(tk.Frame):
 	def __init__(self, parent, controller):
 		tk.Frame.__init__(self, parent)
 
 		projects = controller.projects
 
-		self.listbox = Listbox(self, selectmode=EXTENDED)
+		self.listbox = Listbox(self, selectmode=MULTIPLE)
 
 		for p in projects:
 			self.listbox.insert(END, p)
