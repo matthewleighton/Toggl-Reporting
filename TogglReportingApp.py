@@ -3,9 +3,10 @@
 - Ability to show data across time span longer than 1 year. (Stitch multiple reports together).
 - Add title to graph, showing timespan.
 - Improve the way that project selection is displayed. Maybe list most tracked projects at top?
+- Colour of projects matches that on Toggl
 """
 
-
+import time
 import tkinter as tk
 from tkinter import ttk
 from tkinter import *
@@ -15,11 +16,16 @@ from toggl.TogglPy import Toggl
 from datetime import datetime, timedelta
 
 import csv
+import io
 import re
+
+import tempfile
 
 import matplotlib.pyplot as plt
 
 import config
+
+import math
 
 LARGE_FONT = ("Verdana", 12)
 
@@ -77,6 +83,7 @@ class TogglReportingApp(tk.Tk):
 
 		self.projects = projects
 
+
 	def get_report(self, params):
 		data = {
 		    'workspace_id': config.WORKSPACE_ID,
@@ -84,7 +91,7 @@ class TogglReportingApp(tk.Tk):
 		    'until': params['end'],
 		}
 
-		self.toggl.getDetailedReportCSV(data, "report.csv")
+		return self.toggl.getDetailedReportCSV(data)
 
 	def getTimeInMinutes(self, time):
 		split = re.split(':', time)
@@ -117,10 +124,15 @@ class TogglReportingApp(tk.Tk):
 		return day
 
 	# Populate the day dictionary with data from the report.
-	def populate_day(self, day):
-		with open ('report.csv', 'r') as file:
+	def populate_day(self, day, report):
+		with open (report.name, 'r') as file:
 			reader = csv.DictReader(file)
 			for row in reader:
+				
+				# Skipping header rows from merged csv.
+				if row['Email'] == 'Email':
+					continue
+
 				startMinutes = self.getTimeInMinutes(row['Start time'])
 				duration = self.getTimeInMinutes(row['Duration'])
 
@@ -140,12 +152,12 @@ class TogglReportingApp(tk.Tk):
 			
 		return day
 
-	def main_sequence(self, params):
+	def main_sequence(self, params, report):
 		self.connect_to_toggl()
 
 		day = self.get_day()
 
-		day = self.populate_day(day)
+		day = self.populate_day(day, report)
 
 		self.create_graph(day)
 
@@ -273,20 +285,76 @@ class StartPage(tk.Frame):
 
 		return dates
 
+	# Return the length of time that a report covers. (In days)
+	def get_report_span(self, start, end):
+		span = end - start
+		return span.days
+
+	# Return a list containing a series of bounds, each of at most 1 year long.
+	def split_date_bounds(self, bounds):
+		span = self.get_report_span(bounds['start'], bounds['end'])
+
+		number_of_years = math.ceil(span/365)
+
+		bounds = []
+
+		for year in range(number_of_years):
+			remaining_days_after_subtraction = span - 365
+			
+			start = datetime.now() - timedelta(days = span)
+
+			if (remaining_days_after_subtraction > 0):
+				span = remaining_days_after_subtraction	
+				end = datetime.now() - timedelta(days = span + 1) #(Plus 1 so we don't get an overlap at the edge of the bounds)
+			else:
+				end = datetime.now()
+
+			bounds.append(
+				{
+					'start': start,
+					'end': end
+				}
+			)
+
+		return bounds
 
 
 	def confirm_date_selection(self):
 
 		date_bounds = self.get_date_bounds()
 
-		params = {
-			'start': date_bounds['start'],
-			'end': date_bounds['end']
-		}
+		# Split the request into several with a max length of one year. (Toggl API only allows reports of max 1 year length)
+		split_bounds = self.split_date_bounds(date_bounds)
 
-		app.get_report(params)
+		reports = []
 
-		app.main_sequence(params)
+		for bounds in split_bounds:
+			params = {
+				'start': bounds['start'],
+				'end': bounds['end']
+			}
+
+			reports.append(app.get_report(params))
+
+		joined_report = self.join_reports(reports)
+
+		app.main_sequence(params, joined_report)
+
+	def join_reports(self, reports_list):
+		filename = 'test.csv'
+
+		test = ''
+
+		temporary_csv_file = tempfile.NamedTemporaryFile()
+
+		for report in reports_list:
+
+			with open(temporary_csv_file.name, 'ab') as csv:
+				csv.write(report)
+
+
+		return temporary_csv_file
+
 
 # ProjectsPage Class -------------------------------------------------------------------------------------------
 class ProjectsPage(tk.Frame):
