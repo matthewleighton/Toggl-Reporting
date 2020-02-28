@@ -2,6 +2,7 @@
 #To Do List:
 - Add title to graph, showing timespan.
 - Improve the way that project selection is displayed. Maybe list most tracked projects at top?
+- Ability to serach by task description (Compare different tasks?)
 """
 
 import time
@@ -65,12 +66,24 @@ class TogglReportingApp(tk.Tk):
 		
 		self.user_data = self.toggl.request("https://www.toggl.com/api/v8/me?with_related_data=true")
 
-		project_data 	  = self.user_data['data']['projects']
+		project_data 	  = self.remove_empty_projects(self.user_data['data']['projects'])
 		project_data_dict = {project_data[i]['name']: project_data[i] for i in range(0, len(project_data))}
 
 		self.master_project_list = project_data_dict
 		self.project_list 		 = project_data_dict
 
+	# Return a version of the project list, where all projects without any tracked hours are removed.
+	# (This also removes projects which have been deleted via Toggl, but are still retrieved via the API)
+	def remove_empty_projects(self, project_list):
+		to_delete = []
+		for i in range(0, len(project_list)):
+			if not 'actual_hours' in project_list[i]:
+				to_delete.append(i)
+
+		for i in sorted(to_delete, reverse=True):
+			del project_list[i]
+
+		return project_list
 
 	def get_report(self, params):
 		data = {
@@ -350,6 +363,14 @@ class ProjectsPage(tk.Frame):
 		tk.Frame.__init__(self, parent)
 
 		project_list = controller.master_project_list
+		
+		mylist = {}
+		for project_name in project_list:
+
+			mylist[project_name] = project_list[project_name]['actual_hours']
+
+		print(mylist)
+
 
 		self.listbox = Listbox(self, selectmode=MULTIPLE)
 
