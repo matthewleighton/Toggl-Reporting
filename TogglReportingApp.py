@@ -1,9 +1,7 @@
 """
 #To Do List:
-- Ability to show data across time span longer than 1 year. (Stitch multiple reports together).
 - Add title to graph, showing timespan.
 - Improve the way that project selection is displayed. Maybe list most tracked projects at top?
-- Colour of projects matches that on Toggl
 """
 
 import time
@@ -55,8 +53,6 @@ class TogglReportingApp(tk.Tk):
 
 		self.show_frame(StartPage)
 
-		self.projectList = ['Film/TV', 'Maths', 'Reading', 'Real Life Social', 'Physics', 'Coding', 'Johanna']
-
 		
 
 	def show_frame(self, cont):
@@ -69,19 +65,11 @@ class TogglReportingApp(tk.Tk):
 		
 		self.user_data = self.toggl.request("https://www.toggl.com/api/v8/me?with_related_data=true")
 
-		project_data = self.user_data['data']['projects']
+		project_data 	  = self.user_data['data']['projects']
+		project_data_dict = {project_data[i]['name']: project_data[i] for i in range(0, len(project_data))}
 
-		projects = {}
-
-		for p in project_data:
-			project_name = p['name']
-
-			projects[project_name] = {
-				'color': p['color'],
-				'status': True
-			}
-
-		self.projects = projects
+		self.master_project_list = project_data_dict
+		self.project_list 		 = project_data_dict
 
 
 	def get_report(self, params):
@@ -103,11 +91,11 @@ class TogglReportingApp(tk.Tk):
 
 		return minutes
 
-	def isValidProject(self, project):
-		if project in self.projectList:
+	def is_valid_project(self, project):
+		if project in self.project_list:
 			return True
-		
-		return False
+		else:
+			return False
 
 	# Return an dictionary containing projects with minutes set to zero.
 	def get_day(self):
@@ -118,7 +106,7 @@ class TogglReportingApp(tk.Tk):
 		for i in range (0, minutesInDay+1):
 			emptyDay[i] = 0
 
-		for project in self.projectList:
+		for project in self.project_list:
 			day[project] = emptyDay.copy()
 
 		return day
@@ -138,7 +126,7 @@ class TogglReportingApp(tk.Tk):
 
 				project = row['Project']
 
-				if not self.isValidProject(project):
+				if not self.is_valid_project(project):
 					continue
 
 				for i in range (startMinutes+1, startMinutes+duration+1):
@@ -153,8 +141,6 @@ class TogglReportingApp(tk.Tk):
 		return day
 
 	def main_sequence(self, params, report):
-		self.connect_to_toggl()
-
 		day = self.get_day()
 
 		day = self.populate_day(day, report)
@@ -162,9 +148,11 @@ class TogglReportingApp(tk.Tk):
 		self.create_graph(day)
 
 	def create_graph(self, day):
-		for project in self.projectList:
+		for project_name in self.project_list:
 
-			plt.plot(list(day[project].keys()), list(day[project].values()), label=project)
+			hex_color = self.project_list[project_name]['hex_color']
+
+			plt.plot(list(day[project_name].keys()), list(day[project_name].values()), label=project_name, color=hex_color)
 
 		plt.ylabel('Frequency')
 
@@ -361,12 +349,12 @@ class ProjectsPage(tk.Frame):
 	def __init__(self, parent, controller):
 		tk.Frame.__init__(self, parent)
 
-		projects = controller.projects
+		project_list = controller.master_project_list
 
 		self.listbox = Listbox(self, selectmode=MULTIPLE)
 
-		for p in projects:
-			self.listbox.insert(END, p)
+		for project_name in project_list:
+			self.listbox.insert(END, project_name)
 
 		self.listbox.pack()
 
@@ -377,9 +365,19 @@ class ProjectsPage(tk.Frame):
 	def confirm_project_selection(self, controller):
 		chosen_projects = [self.listbox.get(idx) for idx in self.listbox.curselection()]
 
-		controller.projectList = chosen_projects
+		controller.project_list = {}
+
+		for project_name in chosen_projects:
+			controller.project_list[project_name] = controller.master_project_list[project_name]
 
 		controller.show_frame(StartPage)
+
+	def get_project_hex_color(self, project_name):
+		project_data = app.user_data['data']['projects']
+
+		for project in project_data:
+			if project['name'] == project_name:
+				return project['hex_color']
 
 app = TogglReportingApp()
 
