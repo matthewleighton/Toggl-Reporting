@@ -125,10 +125,24 @@ class TogglReportingApp(tk.Tk):
 			return False
 
 	def main_sequence(self, params, report):
+		self.update_description_restrictions()
+
+
 		day = self.get_day()
 		day = self.populate_day(day, report)
 
 		self.create_graph(day)
+
+	def update_description_restrictions(self):
+		self.allowed_descriptions = []
+
+		for frame in self.description_search_list:
+			children = frame.winfo_children()
+			for child in children:
+				if type(child).__name__ == 'Entry':
+					self.allowed_descriptions.append(child.get().lower())
+					break
+
 
 	# Return an dictionary containing projects with minutes set to zero.
 	def get_day(self):
@@ -149,18 +163,30 @@ class TogglReportingApp(tk.Tk):
 		with open (report.name, 'r') as file:
 			reader = csv.DictReader(file)
 			for row in reader:
+
+				project = row['Project']
+				description = row['Description']
 				
 				# Skipping header rows from merged csv.
 				if row['Email'] == 'Email':
 					continue
 
-				startMinutes = self.getTimeInMinutes(row['Start time'])
-				duration = self.getTimeInMinutes(row['Duration'])
-
-				project = row['Project']
-
 				if not self.is_valid_project(project):
 					continue
+
+				description_match = False
+
+				for allowed_description in self.allowed_descriptions:
+					if allowed_description in description.lower():
+						description_match = True
+						break
+
+				if not description_match:
+					continue
+
+
+				startMinutes = self.getTimeInMinutes(row['Start time'])
+				duration = self.getTimeInMinutes(row['Duration'])
 
 				for i in range (startMinutes+1, startMinutes+duration+1):
 					
@@ -223,8 +249,8 @@ class StartPage(tk.Frame):
 
 		self.create_custom_time_input()
 		self.create_time_frame_select()
-		#self.create_projects_sort_order_select()
 		self.create_projects_select()
+		self.create_description_search()
 		self.create_create_graph_button()
 
 	# Create the frame for the input of custom time bounds.
@@ -290,9 +316,46 @@ class StartPage(tk.Frame):
 		for project in selector_list:
 			self.project_selector.insert(END, project['name'])
 
+
+	def create_description_search(self):
+		self.description_search_frame = LabelFrame(self, text='Description', padx=10, pady=10)
+
+
+		self.controller.description_search_list = []
+
+		self.add_new_description_search()
+
+		
+
+
+		self.description_search_frame.grid(row=2, column=1)
+
+	def add_new_description_search(self):
+		frame = Frame(self.description_search_frame)
+
+		description_search_element = Entry(frame, textvariable='')
+		description_search_element.grid(row=len(self.controller.description_search_list), column=0)
+
+		new_description_button = ttk.Button(frame, text="+", command=self.add_new_description_search)
+		new_description_button.grid(row=len(self.controller.description_search_list), column=1)
+
+		delete_description_button = ttk.Button(frame, text="-", command=lambda: self.delete_description_search(frame, description_search_element))
+		delete_description_button.grid(row=len(self.controller.description_search_list), column=2) 
+
+		self.controller.description_search_list.append(frame)
+
+		frame.pack()
+
+	def delete_description_search(self, frame, entry):
+		if len(self.controller.description_search_list) < 2:
+			entry.delete(0, 'end')
+		else:
+			self.controller.description_search_list.remove(frame)
+			frame.destroy()
+
 	def create_create_graph_button(self):
 		create_graph_button = ttk.Button(self, text="Create Graph", command=self.confirm_date_selection)
-		create_graph_button.grid(row=2, column=0, padx=10, pady=10)
+		create_graph_button.grid(row=3, column=0, padx=10, pady=10)
 
 
 	# Check if the user has selected a custom time frame. If so, display the custom time input frame.
