@@ -136,12 +136,9 @@ class TogglReportingApp(tk.Tk):
 	def update_description_restrictions(self):
 		self.allowed_descriptions = []
 
-		for frame in self.description_search_list:
-			children = frame.winfo_children()
-			for child in children:
-				if type(child).__name__ == 'Entry':
-					self.allowed_descriptions.append(child.get().lower())
-					break
+		for i in self.description_search_list:
+			value = self.description_search_list[i]['entry'].get()
+			self.allowed_descriptions.append(value)
 
 
 	# Return an dictionary containing projects with minutes set to zero.
@@ -251,6 +248,7 @@ class StartPage(tk.Frame):
 		self.create_time_frame_select()
 		self.create_projects_select()
 		self.create_description_search()
+		self.create_more_settings_button()
 		self.create_create_graph_button()
 
 	# Create the frame for the input of custom time bounds.
@@ -320,38 +318,58 @@ class StartPage(tk.Frame):
 	def create_description_search(self):
 		self.description_search_frame = LabelFrame(self, text='Description', padx=10, pady=10)
 
+		self.description_id = 1
 
-		self.controller.description_search_list = []
+
+		self.controller.description_search_list = {}
 
 		self.add_new_description_search()
-
-		
-
 
 		self.description_search_frame.grid(row=2, column=1)
 
 	def add_new_description_search(self):
 		frame = Frame(self.description_search_frame)
 
-		description_search_element = Entry(frame, textvariable='')
-		description_search_element.grid(row=len(self.controller.description_search_list), column=0)
+		# ID of the user's description. We use this to keep track of them when the user deletes descriptions.
+		description_id = self.description_id
+
+		entry = Entry(frame, textvariable='')
+		entry.grid(row=len(self.controller.description_search_list), column=0)
 
 		new_description_button = ttk.Button(frame, text="+", command=self.add_new_description_search)
 		new_description_button.grid(row=len(self.controller.description_search_list), column=1)
 
-		delete_description_button = ttk.Button(frame, text="-", command=lambda: self.delete_description_search(frame, description_search_element))
+		delete_description_button = ttk.Button(frame, text="-", command=lambda: self.delete_description_search(description_id, entry))
 		delete_description_button.grid(row=len(self.controller.description_search_list), column=2) 
 
-		self.controller.description_search_list.append(frame)
+		self.controller.description_search_list[self.description_id] = {
+			'frame': frame,
+			'entry': entry
+		}
 
 		frame.pack()
 
-	def delete_description_search(self, frame, entry):
+		self.description_id += 1
+
+	def delete_description_search(self, description_id, entry):
 		if len(self.controller.description_search_list) < 2:
 			entry.delete(0, 'end')
 		else:
-			self.controller.description_search_list.remove(frame)
-			frame.destroy()
+			description = self.controller.description_search_list[description_id]
+			description['frame'].destroy()
+			del self.controller.description_search_list[description_id]
+
+	def create_more_settings_button(self):
+		button = ttk.Button(self, text='More Settings', command=self.display_more_settings)
+		button.grid(row=2, column=2, padx=10, pady=10)
+
+	def display_more_settings(self): #TODO-NEXT: Continue updating settings window. 
+		t = tk.Toplevel(self)
+		t.wm_title("Window!" )
+		l = tk.Label(t, text="This is test")
+		l.pack(side="top", fill="both", expand=True, padx=100, pady=100)
+
+		t.grab_set()
 
 	def create_create_graph_button(self):
 		create_graph_button = ttk.Button(self, text="Create Graph", command=self.confirm_date_selection)
