@@ -44,13 +44,20 @@ class TogglReportingApp(tk.Tk):
 		self.frames = {}
 
 		self.connect_to_toggl()
+		self.get_toggl_project_data()
 
-		for F in (StartPage, ProjectsPage):
+		frame = StartPage(container, self)
+		self.frames[StartPage] = frame
+		frame.grid(row=0, column=0, sticky='nsew')
+
+		"""
+		for F in (StartPage):
 			frame = F(container, self)
 
 			self.frames[F] = frame
 
 			frame.grid(row=0, column=0, sticky="nsew")
+		"""
 
 		self.show_frame(StartPage)
 
@@ -60,10 +67,12 @@ class TogglReportingApp(tk.Tk):
 		frame=self.frames[cont]
 		frame.tkraise()
 
+	# Establish the connection to the TogglAPI, and collect the project data.
 	def connect_to_toggl(self):
 		self.toggl = Toggl()
 		self.toggl.setAPIKey(config.API_KEY)
 		
+	def get_toggl_project_data(self):
 		self.user_data = self.toggl.request("https://www.toggl.com/api/v8/me?with_related_data=true")
 
 		project_data 	  = self.remove_empty_projects(self.user_data['data']['projects'])
@@ -71,6 +80,7 @@ class TogglReportingApp(tk.Tk):
 
 		self.master_project_list = project_data_dict
 		self.project_list 		 = project_data_dict
+
 
 	# Return a version of the project list, where all projects without any tracked hours are removed.
 	# (This also removes projects which have been deleted via Toggl, but are still retrieved via the API)
@@ -190,25 +200,46 @@ class TogglReportingApp(tk.Tk):
 
 		plt.show()
 
+
 # StartPage Class -------------------------------------------------------------------------------------------
 class StartPage(tk.Frame):
 
 	def __init__(self, parent, controller):
 		tk.Frame.__init__(self, parent)
 
+		self.controller = controller
+
 		self.define_preset_date_bounds()
 
 		self.create_custom_time_input()
 
 		self.create_time_frame_select()
-		
-		select_projects_button = ttk.Button(self, text="Projects",
-								command=lambda: controller.show_frame(ProjectsPage))
-		select_projects_button.grid(row=0, column=1, padx=10, pady=10)
 
-		create_graph_button = ttk.Button(self, text="Create Graph",
-							command=self.confirm_date_selection)
+		create_graph_button = ttk.Button(self, text="Create Graph", command=self.confirm_date_selection)
 		create_graph_button.grid(row=2, column=0, padx=10, pady=10)
+
+		self.create_projects_select(controller)
+
+	def create_projects_select(self, controller):
+		self.project_selector_frame = LabelFrame(self, text="Projects", padx=10, pady=10)
+
+		project_list = controller.master_project_list
+		
+		selector_list = {}
+		for project_name in project_list:
+
+			selector_list[project_name] = project_list[project_name]['actual_hours']
+
+		self.project_selector = Listbox(self.project_selector_frame, selectmode=MULTIPLE, exportselection=False)
+
+		for project_name in project_list:
+			self.project_selector.insert(END, project_name)
+
+		self.project_selector.grid(row=0, column=0)
+
+		self.project_selector_frame.grid(row=1, column=3, padx=10, pady=10)
+
+
 
 	def define_preset_date_bounds(self):
 		year = 365
@@ -241,7 +272,7 @@ class StartPage(tk.Frame):
 		time_frame_label = ttk.Label(self, text="Time Frame:")
 		time_frame_label.grid(row=1, column=0, padx=10, pady=10)
 
-		self.time_frame_select = Listbox(self, selectmode=SINGLE)
+		self.time_frame_select = Listbox(self, selectmode=SINGLE, exportselection=False)
 
 		for i in self.preset_date_bouds:
 			self.time_frame_select.insert(END, i)
@@ -319,8 +350,18 @@ class StartPage(tk.Frame):
 
 		return bounds
 
+	def confirm_project_selection(self):
+		chosen_projects = [self.project_selector.get(idx) for idx in self.project_selector.curselection()]
+
+		self.controller.project_list = {}
+
+		for project_name in chosen_projects:
+			self.controller.project_list[project_name] = self.controller.master_project_list[project_name]
+
+		self.controller.show_frame(StartPage)
 
 	def confirm_date_selection(self):
+		self.confirm_project_selection()
 
 		date_bounds = self.get_date_bounds()
 
@@ -353,52 +394,7 @@ class StartPage(tk.Frame):
 			with open(temporary_csv_file.name, 'ab') as csv:
 				csv.write(report)
 
-
 		return temporary_csv_file
-
-
-# ProjectsPage Class -------------------------------------------------------------------------------------------
-class ProjectsPage(tk.Frame):
-	def __init__(self, parent, controller):
-		tk.Frame.__init__(self, parent)
-
-		project_list = controller.master_project_list
-		
-		mylist = {}
-		for project_name in project_list:
-
-			mylist[project_name] = project_list[project_name]['actual_hours']
-
-		print(mylist)
-
-
-		self.listbox = Listbox(self, selectmode=MULTIPLE)
-
-		for project_name in project_list:
-			self.listbox.insert(END, project_name)
-
-		self.listbox.pack()
-
-
-		confirm_projects_button = Button(self, text="Confirm", command=lambda: self.confirm_project_selection(controller))
-		confirm_projects_button.pack()
-
-	def confirm_project_selection(self, controller):
-		chosen_projects = [self.listbox.get(idx) for idx in self.listbox.curselection()]
-
-		controller.project_list = {}
-
-		for project_name in chosen_projects:
-			controller.project_list[project_name] = controller.master_project_list[project_name]
-
-		controller.show_frame(StartPage)
-
-	def get_project_hex_color(self, project_name):
-		project_data = app.user_data['data']['projects']
-
-		for project in project_data:
-			if project['name'] == project_name:
-				return project['hex_color']
 
 app = TogglReportingApp()
 
