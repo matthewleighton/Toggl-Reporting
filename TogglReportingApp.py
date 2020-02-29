@@ -1,7 +1,6 @@
 """
 #To Do List:
 - Add title to graph, showing timespan.
-- Improve the way that project selection is displayed. Maybe list most tracked projects at top?
 - Ability to serach by task description (Compare different tasks?)
 """
 
@@ -25,6 +24,7 @@ import matplotlib.pyplot as plt
 import config
 
 import math
+from operator import itemgetter
 
 LARGE_FONT = ("Verdana", 12)
 
@@ -213,7 +213,7 @@ class TogglReportingApp(tk.Tk):
 
 		plt.show()
 
-
+# -----------------------------------------------------------------------------------------------------------
 # StartPage Class -------------------------------------------------------------------------------------------
 class StartPage(tk.Frame):
 
@@ -223,6 +223,7 @@ class StartPage(tk.Frame):
 
 		self.create_custom_time_input()
 		self.create_time_frame_select()
+		#self.create_projects_sort_order_select()
 		self.create_projects_select()
 		self.create_create_graph_button()
 
@@ -259,21 +260,35 @@ class StartPage(tk.Frame):
 	def create_projects_select(self):
 		self.project_selector_frame = LabelFrame(self, text="Projects", padx=10, pady=10)
 
-		master_project_list = self.controller.master_project_list
-		
-		selector_list = {}
-		for project_name in master_project_list:
+		sort_orders = ['Time Tracked', 'Alphabetical']
+		self.project_sort_order = StringVar()
+		self.project_sort_order.set(sort_orders[0])
+		self.project_sort_order.trace('w', self.populate_projects_select)
 
-			selector_list[project_name] = master_project_list[project_name]['actual_hours']
+		self.project_sort_order_select = OptionMenu(self.project_selector_frame, self.project_sort_order, *sort_orders)
+		self.project_sort_order_select.grid(row=0, column=0, pady=5)
 
 		self.project_selector = Listbox(self.project_selector_frame, selectmode=MULTIPLE, exportselection=False)
-
-		for project_name in master_project_list:
-			self.project_selector.insert(END, project_name)
-
-		self.project_selector.grid(row=0, column=0)
+		self.populate_projects_select()
+		self.project_selector.grid(row=1, column=0)
 
 		self.project_selector_frame.grid(row=1, column=3, padx=10, pady=10)
+
+	# Populate the projects selector list, according to the chosen sort order.
+	def populate_projects_select(self, *args):
+		self.project_selector.delete(0, END) # Remove old contents of list.
+
+		sort_order 	  = self.project_sort_order.get()
+		selector_list = self.controller.master_project_list
+
+		if sort_order == 'Alphabetical':
+			selector_list = sorted(selector_list.values(), key=itemgetter('name'))
+		else:
+			selector_list = sorted(selector_list.values(), key=itemgetter('actual_hours'))
+			selector_list.reverse()
+
+		for project in selector_list:
+			self.project_selector.insert(END, project['name'])
 
 	def create_create_graph_button(self):
 		create_graph_button = ttk.Button(self, text="Create Graph", command=self.confirm_date_selection)
