@@ -36,7 +36,10 @@ class TogglReportingApp(tk.Tk):
 		self.connect_to_toggl()
 		self.get_toggl_project_data()
 		self.define_preset_date_bounds()
-		self.set_group_by('Project')
+		
+		self.group_by = 'Description'
+		self.description_groupings = []
+
 
 		tk.Tk.__init__(self, *args, **kwargs)
 
@@ -132,6 +135,9 @@ class TogglReportingApp(tk.Tk):
 	def main_sequence(self, params, report):
 		self.update_description_restrictions()
 
+		#print('Group By: ', self.group_by)
+		#print(self.description_groupings)
+		#exit()
 
 		day = self.get_day()
 		day = self.populate_day(day, report)
@@ -372,8 +378,29 @@ class StartPage(tk.Frame):
 		self.settings_window = Toplevel(self)
 		self.create_description_grouping_frame()
 		self.create_group_by_frame()
+
+		self.settings_window.protocol('WM_DELETE_WINDOW', self.close_more_settings_window)
 		
 		self.settings_window.grab_set()
+
+	def close_more_settings_window(self):
+		group_by = self.group_by_listbox.get(self.group_by_listbox.curselection())
+		self.controller.group_by = group_by
+
+		if group_by == 'Description':
+			for description_group in self.description_grouping_listboxes:
+				title = description_group['entry'].get()
+				descriptions = description_group['listbox'].get(0, END)
+
+				if len(descriptions) == 0:
+					continue
+				
+				self.controller.description_groupings.append({
+					'title': title,
+					'descriptions': descriptions
+					})
+
+		self.settings_window.destroy()
 
 	def create_group_by_frame(self):
 		self.group_by_frame = LabelFrame(self.settings_window, text="Group by", padx=10, pady=10)
