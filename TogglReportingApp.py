@@ -1,8 +1,11 @@
 """
 #To Do List:
+- Button to select all/no projects
+- Set a default selected time span
 - Add title to graph, showing timespan.
-- Ability to serach by task description (Compare different tasks?)
+- Search by client
 - Some kind of search via tags
+- Mark description as "NOT". Something which would allow a graph of "X vs other"
 """
 
 import time
@@ -411,6 +414,7 @@ class StartPage(tk.Frame):
 	def close_more_settings_window(self):
 		group_by = self.group_by_listbox.get(self.group_by_listbox.curselection())
 		self.controller.group_by = group_by
+		self.controller.description_groupings = []
 
 		if group_by == 'Description':
 			for description_group in self.description_grouping_listboxes:
