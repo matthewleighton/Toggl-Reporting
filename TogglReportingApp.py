@@ -426,10 +426,10 @@ class StartPage(tk.Frame):
 
 		move_description_buttons = Frame(self.description_grouping_frame)
 
-		left_button = ttk.Button(move_description_buttons, text="<<")
+		left_button = ttk.Button(move_description_buttons, text="<<", command=lambda: self.move_description('left'))
 		left_button.grid(row=0, column=0)
 
-		right_button = ttk.Button(move_description_buttons, text=">>")
+		right_button = ttk.Button(move_description_buttons, text=">>", command=lambda: self.move_description('right'))
 		right_button.grid(row=0, column=1)
 
 		move_description_buttons.grid(row=10, column=0, sticky='w')
@@ -437,7 +437,6 @@ class StartPage(tk.Frame):
 		self.description_grouping_frame.grid(row=5, column=0, sticky='w')
 
 	def create_description_grouping_listbox(self, description, column):
-		print('create_description_grouping_listbox')
 		frame = Frame(self.description_grouping_frame)
 
 		entry = Entry(frame)
@@ -445,7 +444,7 @@ class StartPage(tk.Frame):
 		entry.config(state='disabled')
 		entry.pack()
 
-		listbox = Listbox(frame, selectmode=SINGLE, exportselection=FALSE)
+		listbox = Listbox(frame, selectmode=SINGLE, exportselection=True)
 		listbox.insert(END, description)
 		listbox.pack()
 
@@ -457,6 +456,32 @@ class StartPage(tk.Frame):
 				'entry': entry,
 				'listbox': listbox
 			})
+
+	def move_description(self, direction):
+		for description_group in self.description_grouping_listboxes:
+			#print(description_group)
+
+			grouping_id = description_group['grouping_id']
+			listbox = description_group['listbox']
+			selected_value_id = listbox.curselection()
+			if selected_value_id:
+				break
+
+		max_grouping_id = len(self.description_grouping_listboxes)-1
+		id_adjustment   = 1 if direction == 'right' else -1
+		new_grouping_id = grouping_id + id_adjustment
+
+		# Check if we're trying to move left/right from edge of table.
+		if new_grouping_id < 0 or new_grouping_id > max_grouping_id:
+			return
+
+		selected_description = listbox.get(listbox.curselection())
+		listbox.delete(selected_value_id)
+
+		new_listbox = self.description_grouping_listboxes[new_grouping_id]['listbox']
+
+		new_listbox.insert(END, selected_description)
+
 
 
 	def create_create_graph_button(self):
