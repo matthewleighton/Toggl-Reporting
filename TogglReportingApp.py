@@ -37,7 +37,7 @@ class TogglReportingApp(tk.Tk):
 		self.get_toggl_project_data()
 		self.define_preset_date_bounds()
 		
-		self.group_by = 'Description'
+		self.group_by = 'Project'
 		self.description_groupings = []
 
 
@@ -161,8 +161,13 @@ class TogglReportingApp(tk.Tk):
 		for i in range (0, minutesInDay+1):
 			emptyDay[i] = 0
 
-		for project in self.project_list:
-			day[project] = emptyDay.copy()
+		if self.group_by == 'Project':
+			for project in self.project_list:
+				day[project] = emptyDay.copy()
+
+		if self.group_by == 'Description':
+			for grouping in self.description_groupings:
+				day[grouping['title']] = emptyDay.copy()
 
 		return day
 
@@ -184,14 +189,24 @@ class TogglReportingApp(tk.Tk):
 
 				description_match = False
 
-				for allowed_description in self.allowed_descriptions:
-					if allowed_description in description.lower():
-						description_match = True
-						break
+				if self.group_by == 'Description':
+					matched_description_groups = []
 
-				if not description_match:
-					continue
+					for description_grouping in self.description_groupings:
+						for user_description in description_grouping['descriptions']:
+							if user_description in description.lower():
+								description_match = True
+								grouping_title = description_grouping['title']
+								if not grouping_title in matched_description_groups:
+									matched_description_groups.append(grouping_title)
+				else:
+					for allowed_description in self.allowed_descriptions:
+						if allowed_description in description.lower():
+							description_match = True
+							break
 
+					if not description_match:
+						continue
 
 				startMinutes = self.getTimeInMinutes(row['Start time'])
 				duration = self.getTimeInMinutes(row['Duration'])
@@ -203,8 +218,12 @@ class TogglReportingApp(tk.Tk):
 					if targetMinute >= 1440:
 						targetMinute = abs(1440-i)
 
-					day[project][targetMinute] += 1
-			
+					if self.group_by == 'Project':
+						day[project][targetMinute] += 1
+					elif self.group_by == 'Description':
+						for description_group in matched_description_groups:
+							day[description_group][targetMinute] += 1
+
 		return day
 
 	def getTimeInMinutes(self, time):
@@ -218,11 +237,17 @@ class TogglReportingApp(tk.Tk):
 		return minutes
 
 	def create_graph(self, day):
-		for project_name in self.project_list:
+		if self.group_by == 'Project':
+			for project_name in self.project_list:
 
-			hex_color = self.project_list[project_name]['hex_color']
+				hex_color = self.project_list[project_name]['hex_color']
 
-			plt.plot(list(day[project_name].keys()), list(day[project_name].values()), label=project_name, color=hex_color)
+				plt.plot(list(day[project_name].keys()), list(day[project_name].values()), label=project_name, color=hex_color)
+		elif self.group_by == 'Description':
+			for grouping in self.description_groupings:
+				title = grouping['title']
+				plt.plot(list(day[title].keys()), list(day[title].values()), label=title)
+
 
 		plt.ylabel('Frequency')
 
