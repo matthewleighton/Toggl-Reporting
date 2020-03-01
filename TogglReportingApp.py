@@ -482,6 +482,8 @@ class StartPage(tk.Frame):
 
 		new_listbox.insert(END, selected_description)
 
+		new_listbox.select_set(END)
+
 
 
 	def create_create_graph_button(self):
