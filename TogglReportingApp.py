@@ -2,6 +2,7 @@
 #To Do List:
 - Add title to graph, showing timespan.
 - Ability to serach by task description (Compare different tasks?)
+- Some kind of search via tags
 """
 
 import time
@@ -35,6 +36,7 @@ class TogglReportingApp(tk.Tk):
 		self.connect_to_toggl()
 		self.get_toggl_project_data()
 		self.define_preset_date_bounds()
+		self.set_group_by('Project')
 
 		tk.Tk.__init__(self, *args, **kwargs)
 
@@ -108,6 +110,9 @@ class TogglReportingApp(tk.Tk):
 			'Custom':0
 		}
 
+	def set_group_by(self, group_by):
+		self.group_by = group_by
+
 	# Make a request to Toggl to get a report of all data from a given time frame.
 	def get_report(self, params):
 		data = {
@@ -137,7 +142,7 @@ class TogglReportingApp(tk.Tk):
 		self.allowed_descriptions = []
 
 		for i in self.description_search_list:
-			value = self.description_search_list[i]['entry'].get()
+			value = self.description_search_list[i]['entry'].get().lower()
 			self.allowed_descriptions.append(value)
 
 
@@ -363,13 +368,96 @@ class StartPage(tk.Frame):
 		button = ttk.Button(self, text='More Settings', command=self.display_more_settings)
 		button.grid(row=2, column=2, padx=10, pady=10)
 
-	def display_more_settings(self): #TODO-NEXT: Continue updating settings window. 
-		t = tk.Toplevel(self)
-		t.wm_title("Window!" )
-		l = tk.Label(t, text="This is test")
-		l.pack(side="top", fill="both", expand=True, padx=100, pady=100)
+	def display_more_settings(self):
+		self.settings_window = Toplevel(self)
+		self.create_description_grouping_frame()
+		self.create_group_by_frame()
+		
+		self.settings_window.grab_set()
 
-		t.grab_set()
+	def create_group_by_frame(self):
+		self.group_by_frame = LabelFrame(self.settings_window, text="Group by", padx=10, pady=10)
+
+		self.group_by_listbox = Listbox(self.group_by_frame, selectmode=SINGLE, exportselection=False)
+
+		group_by_options = ['Project', 'Client', 'Tag', 'Description']
+
+		for i in group_by_options:
+			self.group_by_listbox.insert(END, i)
+
+		self.group_by_listbox.bind('<<ListboxSelect>>', self.check_group_by_selection)
+		self.group_by_listbox.select_set(0)
+		self.check_group_by_selection()
+		self.group_by_listbox.pack()
+		self.group_by_frame.grid(row=0, column=0, sticky='w')
+		
+	def check_group_by_selection(self, *args):
+		group_by = self.group_by_listbox.get(self.group_by_listbox.curselection())
+		self.controller.set_group_by(group_by)
+
+		if group_by == 'Description':
+			description_groupings = True
+		else:
+			description_groupings = False
+
+		self.toggle_description_grouping(description_groupings)
+
+	# Toggle whether the descriptions grouping frame is displayed or not.
+	def toggle_description_grouping(self, value):
+		if value == True:
+			self.description_grouping_frame.grid(row=5, column=0)
+		else:
+			self.description_grouping_frame.grid_forget()
+
+	def create_description_grouping_frame(self):
+		controller = self.controller
+
+		self.description_grouping_frame = LabelFrame(self.settings_window, text='Grouping by Descriptions', padx=10, pady=10)
+
+		controller.update_description_restrictions()
+		description_list = controller.allowed_descriptions
+
+		self.description_grouping_listboxes = []
+
+		column = 0
+		for description in description_list:
+			self.create_description_grouping_listbox(description, column)
+			column += 1
+
+		move_description_buttons = Frame(self.description_grouping_frame)
+
+		left_button = ttk.Button(move_description_buttons, text="<<")
+		left_button.grid(row=0, column=0)
+
+		right_button = ttk.Button(move_description_buttons, text=">>")
+		right_button.grid(row=0, column=1)
+
+		move_description_buttons.grid(row=10, column=0, sticky='w')
+
+		self.description_grouping_frame.grid(row=5, column=0, sticky='w')
+
+	def create_description_grouping_listbox(self, description, column):
+		print('create_description_grouping_listbox')
+		frame = Frame(self.description_grouping_frame)
+
+		entry = Entry(frame)
+		entry.insert(0, description)
+		entry.config(state='disabled')
+		entry.pack()
+
+		listbox = Listbox(frame, selectmode=SINGLE, exportselection=FALSE)
+		listbox.insert(END, description)
+		listbox.pack()
+
+		frame.grid(row=0, column=column)
+
+		self.description_grouping_listboxes.append({
+				'grouping_id': column,
+				'frame': frame,
+				'entry': entry,
+				'listbox': listbox
+			})
+
 
 	def create_create_graph_button(self):
 		create_graph_button = ttk.Button(self, text="Create Graph", command=self.confirm_date_selection)
