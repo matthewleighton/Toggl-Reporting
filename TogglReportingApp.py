@@ -459,8 +459,6 @@ class StartPage(tk.Frame):
 
 	def move_description(self, direction):
 		for description_group in self.description_grouping_listboxes:
-			#print(description_group)
-
 			grouping_id = description_group['grouping_id']
 			listbox = description_group['listbox']
 			selected_value_id = listbox.curselection()
@@ -475,16 +473,39 @@ class StartPage(tk.Frame):
 		if new_grouping_id < 0 or new_grouping_id > max_grouping_id:
 			return
 
+		old_grouping_id = grouping_id
+
 		selected_description = listbox.get(listbox.curselection())
 		listbox.delete(selected_value_id)
 
 		new_listbox = self.description_grouping_listboxes[new_grouping_id]['listbox']
-
 		new_listbox.insert(END, selected_description)
-
 		new_listbox.select_set(END)
 
+		new_listbox_values = new_listbox.get(0, END)
+		old_listbox_values = listbox.get(0, END)
 
+		self.toggle_active_description_group_title(old_grouping_id)
+		self.toggle_active_description_group_title(new_grouping_id)
+			
+	# Display the correct title, and active/disabled state of a description listbox.
+	def toggle_active_description_group_title(self, grouping_id):
+		grouping 			   = self.description_grouping_listboxes[grouping_id]
+		entry 				   = grouping['entry']
+		listbox_values 		   = grouping['listbox'].get(0, END)
+		number_of_descriptions = len(listbox_values)
+
+		entry.config(state='normal')
+
+		if number_of_descriptions < 2:
+			entry.config(state='normal')
+			entry.delete(0, 'end')
+
+			if number_of_descriptions == 1:
+				entry_value = listbox_values[0]
+				entry.insert(0, entry_value)
+
+			entry.config(state='disabled')
 
 	def create_create_graph_button(self):
 		create_graph_button = ttk.Button(self, text="Create Graph", command=self.confirm_date_selection)
