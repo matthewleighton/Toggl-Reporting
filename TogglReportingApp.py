@@ -2,7 +2,6 @@
 #To Do List:
 - Ability to select "All Projects", giving a graph which just shows total time tracked.
 - Button to select all/no projects
-- Set a default selected time span
 - Add title to graph, showing timespan.
 - Search by client
 - Some kind of search via tags
@@ -184,6 +183,8 @@ class TogglReportingApp(tk.Tk):
 		if self.group_by == 'Description':
 			for grouping in self.description_groupings:
 				day[grouping['title']] = emptyDay.copy()
+		if self.group_by == 'None':
+			day = emptyDay
 
 		return day
 
@@ -243,6 +244,8 @@ class TogglReportingApp(tk.Tk):
 					elif self.group_by == 'Description':
 						for description_group in matched_description_groups:
 							day[description_group][targetMinute] += 1
+					elif self.group_by == 'None':
+						day[targetMinute] += 1
 
 		return day
 
@@ -267,6 +270,8 @@ class TogglReportingApp(tk.Tk):
 			for grouping in self.description_groupings:
 				title = grouping['title']
 				plt.plot(list(day[title].keys()), list(day[title].values()), label=title)
+		elif self.group_by == 'None':
+			plt.plot(list(day.keys()), list(day.values()))
 
 
 		plt.ylabel('Frequency')
@@ -462,7 +467,7 @@ class StartPage(tk.Frame):
 
 		self.group_by_listbox = Listbox(self.group_by_frame, selectmode=SINGLE, exportselection=False)
 
-		group_by_options = ['Project', 'Client', 'Tag', 'Description']
+		group_by_options = ['Project', 'Client', 'Tag', 'Description', 'None']
 
 		for i in group_by_options:
 			self.group_by_listbox.insert(END, i)
