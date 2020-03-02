@@ -1,11 +1,17 @@
 """
 #To Do List:
+- Make it more efficient by only grabbing all the data once upon login. We don't need to be making new requests for every graph.
+- Ability to show multiple graphs at once
+- Rename "More Settings" button to "Grouping Settings"
 - Add title to graph, showing timespan.
 - Search by client
 - Some kind of search via tags
 - Ability to save/load different configurations of settings
 - Ability to manually enter Toggl info to login, and switch between accounts.
 - Some kind of "search" function for descriptions. Able to search for description of particular project
+- Add "Ignore" tickbox next to each description. To temporarily disable it.
+- Option to add 'Now' line onto graph
+- Multiple time frames, and group by time frame. So we can see how tracking changes in span 1 vs span 2.
 """
 
 import time
@@ -89,6 +95,15 @@ class TogglReportingApp(tk.Tk):
 
 		self.master_project_list = project_data_dict # Unchanging "master" list
 		self.project_list 		 = project_data_dict # List of active projects to be displayed in the graph
+
+
+
+		client_data 	 = self.user_data['data']['clients']
+		client_data_dict = {client_data[i]['name']: client_data[i] for i in range(0, len(client_data))}
+
+		self.master_client_list  = client_data_dict # Unchanging "master" list
+		self.client_list 		 = client_data_dict # List of active projects to be displayed in the graph		
+
 
 	# Return a version of the project list, where all projects without any tracked hours are removed.
 	# (This also removes projects which have been deleted via Toggl, but are still retrieved via the API)
@@ -305,6 +320,7 @@ class StartPage(tk.Frame):
 		self.create_custom_time_input()
 		self.create_time_frame_select()
 		self.create_projects_select()
+		self.create_client_select()
 		self.create_description_search()
 		self.create_more_settings_button()
 		self.create_create_graph_button()
@@ -347,13 +363,13 @@ class StartPage(tk.Frame):
 		sort_orders = ['Time Tracked', 'Alphabetical']
 		self.project_sort_order = StringVar()
 		self.project_sort_order.set(sort_orders[0])
-		self.project_sort_order.trace('w', self.populate_projects_select)
+		self.project_sort_order.trace('w', self.populate_project_listbox)
 
 		self.project_sort_order_select = OptionMenu(self.project_selector_frame, self.project_sort_order, *sort_orders)
 		self.project_sort_order_select.grid(row=0, column=0, pady=5)
 
 		self.project_selector = Listbox(self.project_selector_frame, selectmode=MULTIPLE, exportselection=False)
-		self.populate_projects_select()
+		self.populate_project_listbox()
 		self.project_selector.grid(row=1, column=0)
 
 		self.projects_select_all_button = ttk.Button(self.project_selector_frame, text="Select All", command=self.toggle_all_projects)
@@ -361,8 +377,37 @@ class StartPage(tk.Frame):
 
 		self.project_selector_frame.grid(row=1, column=3, padx=10, pady=10)
 
+	def create_client_select(self):
+		self.client_selector_frame = LabelFrame(self, text='Clients', padx=10, pady=10)
+		self.client_selector_frame.grid(row=1, column=4, padx=10, pady=10)
+
+		self.client_selector = Listbox(self.client_selector_frame, selectmode=MULTIPLE, exportselection=False)
+		self.populate_client_listbox()
+		self.client_selector.grid(row=1, column=0)
+
+		self.clients_select_all_button = ttk.Button(self.client_selector_frame, text="Select None", command=self.toggle_all_clients)
+		self.clients_select_all_button.grid(row=2, column=0, padx=10, pady=10)
+
+	def populate_client_listbox(self):
+		self.client_selector.delete(0, END)
+
+		client_list = self.controller.master_client_list
+
+		client_list = sorted(client_list.values(), key=itemgetter('name'))
+
+		for client in client_list:
+			self.client_selector.insert(END, client['name'])
+
+		self.client_selector.select_set(0, END) # Select all clients by default.
+
+		#print(client_list)
+
+
+
+
+
 	# Populate the projects selector list, according to the chosen sort order.
-	def populate_projects_select(self, *args):
+	def populate_project_listbox(self, *args):
 		self.project_selector.delete(0, END) # Remove old contents of list.
 
 		sort_order 	  = self.project_sort_order.get()
@@ -391,6 +436,20 @@ class StartPage(tk.Frame):
 		else: # Select all projects
 			listbox.select_set(0, END)
 			button.config(text = 'Select None')
+
+	def toggle_all_clients(self):
+		listbox = self.client_selector
+		button = self.clients_select_all_button
+
+		number_of_clients = listbox.size()
+		number_selected = len(listbox.curselection())
+
+		if number_selected == number_of_clients: # Unselect all clients
+			listbox.selection_clear(0, END)
+			button.config(text = 'Select All')
+		else: # Select all clients
+			listbox.select_set(0, END)
+			button.config(text = 'Select None')		
 
 	def create_description_search(self):
 		self.description_search_frame = LabelFrame(self, text='Description', padx=10, pady=10)
