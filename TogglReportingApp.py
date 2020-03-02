@@ -115,9 +115,9 @@ class TogglReportingApp(tk.Tk):
 			'Past Week': 	 7,
 			'Past Month': 	 month,
 			'Past 6 Months': month*6,
-			'Past year': 	 year,
-			'Past 2 years':  year*2,
-			'Past 5 years':  year*5,
+			'Past Year': 	 year,
+			'Past 2 Years':  year*2,
+			'Past 5 Years':  year*5,
 			'Custom':0
 		}
 
@@ -142,7 +142,7 @@ class TogglReportingApp(tk.Tk):
 
 	def main_sequence(self, params, report):
 		self.update_description_restrictions()
-		
+
 		day = self.get_day()
 		day = self.populate_day(day, report)
 
@@ -334,6 +334,8 @@ class StartPage(tk.Frame):
 			self.time_frame_select.insert(END, i)
 
 		self.time_frame_select.bind('<<ListboxSelect>>', self.check_if_custom_time_frame_selected)
+
+		self.time_frame_select.select_set(3) # Default to past year
 
 		self.time_frame_select.grid(row=1, column=1, padx=10, pady=10)
 
