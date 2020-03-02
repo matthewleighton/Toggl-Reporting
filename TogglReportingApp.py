@@ -9,6 +9,7 @@
 - Mark description as "NOT". Something which would allow a graph of "X vs other"
 - Ability to save/load different configurations of settings
 - Ability to manually enter Toggl info to login, and switch between accounts.
+- Some kind of "search" function for descriptions. Able to search for description of particular project
 """
 
 import time
@@ -141,11 +142,7 @@ class TogglReportingApp(tk.Tk):
 
 	def main_sequence(self, params, report):
 		self.update_description_restrictions()
-
-		#print('Group By: ', self.group_by)
-		#print(self.description_groupings)
-		#exit()
-
+		
 		day = self.get_day()
 		day = self.populate_day(day, report)
 
@@ -153,10 +150,22 @@ class TogglReportingApp(tk.Tk):
 
 	def update_description_restrictions(self):
 		self.allowed_descriptions = []
+		self.excluded_descriptions = []
 
 		for i in self.description_search_list:
-			value = self.description_search_list[i]['entry'].get().lower()
-			self.allowed_descriptions.append(value)
+			description_row = self.description_search_list[i]
+			value 			= description_row['entry'].get().lower()
+			excluded 		= bool(description_row['exclude_checkbox_value'].get())
+
+			if excluded:
+				self.excluded_descriptions.append(value)
+			else:
+				self.allowed_descriptions.append(value)
+
+		# If there are no specifically allowed descriptions, say that an empty string is allowed. (Otherwise we'll return nothing).
+		if not self.allowed_descriptions:
+			self.allowed_descriptions = ['']
+
 
 
 	# Return an dictionary containing projects with minutes set to zero.
@@ -211,6 +220,10 @@ class TogglReportingApp(tk.Tk):
 						if allowed_description in description.lower():
 							description_match = True
 							break
+
+					for excluded_description in self.excluded_descriptions:
+						if excluded_description in description.lower():
+							description_match = False
 
 					if not description_match:
 						continue
@@ -375,19 +388,26 @@ class StartPage(tk.Frame):
 
 		# ID of the user's description. We use this to keep track of them when the user deletes descriptions.
 		description_id = self.description_id
+		row = len(self.controller.description_search_list)
 
 		entry = Entry(frame, textvariable='')
-		entry.grid(row=len(self.controller.description_search_list), column=0)
+		entry.grid(row=row, column=0)
 
 		new_description_button = ttk.Button(frame, text="+", command=self.add_new_description_search)
-		new_description_button.grid(row=len(self.controller.description_search_list), column=1)
+		new_description_button.grid(row=row, column=1)
 
 		delete_description_button = ttk.Button(frame, text="-", command=lambda: self.delete_description_search(description_id, entry))
-		delete_description_button.grid(row=len(self.controller.description_search_list), column=2) 
+		delete_description_button.grid(row=row, column=2)
+
+		exclude_checkbox_value = IntVar()
+		exclude_checkbox = Checkbutton(frame, text='Exclude', variable=exclude_checkbox_value)
+		exclude_checkbox.grid(row=row, column=5)
 
 		self.controller.description_search_list[self.description_id] = {
 			'frame': frame,
-			'entry': entry
+			'entry': entry,
+			'exclude_checkbox': exclude_checkbox,
+			'exclude_checkbox_value': exclude_checkbox_value
 		}
 
 		frame.pack()
