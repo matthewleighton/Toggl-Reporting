@@ -96,14 +96,24 @@ class TogglReportingApp(tk.Tk):
 		self.master_project_list = project_data_dict # Unchanging "master" list
 		self.project_list 		 = project_data_dict # List of active projects to be displayed in the graph
 
-
-
 		client_data 	 = self.user_data['data']['clients']
 		client_data_dict = {client_data[i]['name']: client_data[i] for i in range(0, len(client_data))}
 
 		self.master_client_list  = client_data_dict # Unchanging "master" list
-		self.client_list 		 = client_data_dict # List of active projects to be displayed in the graph		
+		self.client_list 		 = client_data_dict # List of active projects to be displayed in the graph
 
+		# Assigning clients to projects.
+		for client in client_data:
+			client_id = client['id']
+			client_name = client['name']
+
+			for project_name in self.master_project_list:				
+				if not 'cid' in self.master_project_list[project_name]:
+					self.master_project_list[project_name]['client'] = False
+				elif self.master_project_list[project_name]['cid'] == client_id:
+					self.master_project_list[project_name]['client'] = client_name
+
+		self.project_list = self.master_project_list
 
 	# Return a version of the project list, where all projects without any tracked hours are removed.
 	# (This also removes projects which have been deleted via Toggl, but are still retrieved via the API)
@@ -757,12 +767,19 @@ class StartPage(tk.Frame):
 
 	# Assign the user's chosen projects to the controller's active project list.
 	def assign_chosen_projects(self):
-		chosen_projects = [self.project_selector.get(idx) for idx in self.project_selector.curselection()]
+		chosen_projects 	= [self.project_selector.get(idx) for idx in self.project_selector.curselection()]
+		chosen_clients 		= [self.client_selector.get(idx) for idx in self.client_selector.curselection()]
+		master_project_list = self.controller.master_project_list
 
 		self.controller.project_list = {} # Emptying the project list
 
 		for project_name in chosen_projects:
-			self.controller.project_list[project_name] = self.controller.master_project_list[project_name]
+			project_data = master_project_list[project_name]
+
+			project_client = project_data['client']
+			
+			if project_client in chosen_clients:
+				self.controller.project_list[project_name] = master_project_list[project_name]
 
 		self.controller.show_frame(StartPage)
 
