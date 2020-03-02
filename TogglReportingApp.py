@@ -359,6 +359,9 @@ class StartPage(tk.Frame):
 		self.populate_projects_select()
 		self.project_selector.grid(row=1, column=0)
 
+		self.projects_select_all_button = ttk.Button(self.project_selector_frame, text="Select All", command=self.toggle_all_projects)
+		self.projects_select_all_button.grid(row=2, column=0, padx=10, pady=10)
+
 		self.project_selector_frame.grid(row=1, column=3, padx=10, pady=10)
 
 	# Populate the projects selector list, according to the chosen sort order.
@@ -377,6 +380,19 @@ class StartPage(tk.Frame):
 		for project in selector_list:
 			self.project_selector.insert(END, project['name'])
 
+	def toggle_all_projects(self):
+		listbox = self.project_selector
+		button = self.projects_select_all_button
+
+		number_of_projects = listbox.size()
+		number_selected = len(listbox.curselection())
+
+		if number_selected == number_of_projects: # Unselect all projects
+			listbox.selection_clear(0, END)
+			button.config(text = 'Select All')
+		else: # Select all projects
+			listbox.select_set(0, END)
+			button.config(text = 'Select None')
 
 	def create_description_search(self):
 		self.description_search_frame = LabelFrame(self, text='Description', padx=10, pady=10)
