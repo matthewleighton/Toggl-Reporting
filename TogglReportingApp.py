@@ -145,8 +145,14 @@ class TogglReportingApp(tk.Tk):
 
 		return self.toggl.getDetailedReportCSV(data)
 
-	def is_valid_project(self, project):
+	def is_included_project(self, project):
 		if project in self.project_list:
+			return True
+		else:
+			return False
+
+	def is_included_client(self, client):
+		if client in self.client_list:
 			return True
 		else:
 			return False
@@ -177,8 +183,6 @@ class TogglReportingApp(tk.Tk):
 		if not self.allowed_descriptions:
 			self.allowed_descriptions = ['']
 
-
-
 	# Return an dictionary containing projects with minutes set to zero.
 	def get_day(self):
 		minutesInDay = 60*24
@@ -206,14 +210,18 @@ class TogglReportingApp(tk.Tk):
 			reader = csv.DictReader(file)
 			for row in reader:
 
-				project = row['Project']
+				project 	= row['Project']
 				description = row['Description']
+				client 		= row['Client']
 				
 				# Skipping header rows from merged csv.
 				if row['Email'] == 'Email':
 					continue
 
-				if not self.is_valid_project(project):
+				if not self.is_included_project(project):
+					continue
+
+				if not self.is_included_client(client):
 					continue
 
 				description_match = False
@@ -399,12 +407,6 @@ class StartPage(tk.Frame):
 			self.client_selector.insert(END, client['name'])
 
 		self.client_selector.select_set(0, END) # Select all clients by default.
-
-		#print(client_list)
-
-
-
-
 
 	# Populate the projects selector list, according to the chosen sort order.
 	def populate_project_listbox(self, *args):
@@ -731,6 +733,7 @@ class StartPage(tk.Frame):
 
 	def confirm_date_selection(self):
 		self.assign_chosen_projects()
+		self.assign_chosen_clients()
 
 		date_bounds = self.get_date_bounds()
 
@@ -763,6 +766,14 @@ class StartPage(tk.Frame):
 
 		self.controller.show_frame(StartPage)
 
+	def assign_chosen_clients(self):
+		chosen_clients = [self.client_selector.get(idx) for idx in self.client_selector.curselection()]
+		self.controller.client_list = {}
+
+		for client_name in chosen_clients:
+			self.controller.client_list[client_name] = self.controller.master_client_list[client_name]
+
+		self.controller.show_frame(StartPage)
 
 	# Return the start and end date for the bounds that the user has selected.
 	def get_date_bounds(self):
