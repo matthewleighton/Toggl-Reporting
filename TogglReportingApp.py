@@ -1,11 +1,8 @@
 """
 #To Do List:
-- Ability to select "All Projects", giving a graph which just shows total time tracked.
-- Button to select all/no projects
 - Add title to graph, showing timespan.
 - Search by client
 - Some kind of search via tags
-- Mark description as "NOT". Something which would allow a graph of "X vs other"
 - Ability to save/load different configurations of settings
 - Ability to manually enter Toggl info to login, and switch between accounts.
 - Some kind of "search" function for descriptions. Able to search for description of particular project
@@ -312,6 +309,22 @@ class StartPage(tk.Frame):
 		self.create_more_settings_button()
 		self.create_create_graph_button()
 
+	# Create the input selector for the time frame.
+	def create_time_frame_select(self):
+		self.time_frame_frame = LabelFrame(self, text="Time Frame")
+		self.time_frame_frame.grid(row=1, column=0, padx=10, pady=10, sticky='nw')
+
+		self.time_frame_select = Listbox(self.time_frame_frame, selectmode=SINGLE, exportselection=False)
+
+		for i in self.controller.preset_date_bounds:
+			self.time_frame_select.insert(END, i)
+
+		self.time_frame_select.bind('<<ListboxSelect>>', self.check_if_custom_time_frame_selected)
+
+		self.time_frame_select.select_set(3) # Default to past year
+
+		self.time_frame_select.grid(row=1, column=0, padx=10, pady=10)
+
 	# Create the frame for the input of custom time bounds.
 	def create_custom_time_input(self):
 		self.custom_time_input_frame = LabelFrame(self, text="Custom Time Frame", padx=10, pady=10)
@@ -327,22 +340,6 @@ class StartPage(tk.Frame):
 
 		self.end_select = DateEntry(self.custom_time_input_frame)
 		self.end_select.grid(row=1, column=1, padx=10, pady=10)
-
-	# Create the input selector for the time frame.
-	def create_time_frame_select(self):
-		time_frame_label = ttk.Label(self, text="Time Frame:")
-		time_frame_label.grid(row=1, column=0, padx=10, pady=10)
-
-		self.time_frame_select = Listbox(self, selectmode=SINGLE, exportselection=False)
-
-		for i in self.controller.preset_date_bounds:
-			self.time_frame_select.insert(END, i)
-
-		self.time_frame_select.bind('<<ListboxSelect>>', self.check_if_custom_time_frame_selected)
-
-		self.time_frame_select.select_set(3) # Default to past year
-
-		self.time_frame_select.grid(row=1, column=1, padx=10, pady=10)
 
 	def create_projects_select(self):
 		self.project_selector_frame = LabelFrame(self, text="Projects", padx=10, pady=10)
@@ -380,6 +377,7 @@ class StartPage(tk.Frame):
 		for project in selector_list:
 			self.project_selector.insert(END, project['name'])
 
+	# Select all/none of the projects, depending on the current selection state
 	def toggle_all_projects(self):
 		listbox = self.project_selector
 		button = self.projects_select_all_button
@@ -404,7 +402,7 @@ class StartPage(tk.Frame):
 
 		self.add_new_description_search()
 
-		self.description_search_frame.grid(row=2, column=1)
+		self.description_search_frame.grid(row=1, column=0, padx=10, pady=10, sticky='sw')
 
 	def add_new_description_search(self):
 		frame = Frame(self.description_search_frame)
@@ -447,7 +445,7 @@ class StartPage(tk.Frame):
 
 	def create_more_settings_button(self):
 		button = ttk.Button(self, text='More Settings', command=self.display_more_settings)
-		button.grid(row=2, column=2, padx=10, pady=10)
+		button.grid(row=2, column=0, padx=10, pady=10, sticky='w')
 
 	def display_more_settings(self):
 		self.settings_window = Toplevel(self)
@@ -653,7 +651,7 @@ class StartPage(tk.Frame):
 
 	def create_create_graph_button(self):
 		create_graph_button = ttk.Button(self, text="Create Graph", command=self.confirm_date_selection)
-		create_graph_button.grid(row=3, column=0, padx=10, pady=10)
+		create_graph_button.grid(row=2, column=3, padx=10, pady=10, sticky='se')
 
 
 	# Check if the user has selected a custom time frame. If so, display the custom time input frame.
@@ -668,11 +666,9 @@ class StartPage(tk.Frame):
 	# Hide/show the custom date input box	
 	def toggle_custom_date_input(self, value):
 		if value == True:
-			self.custom_time_input_frame.grid(row=1, column=2, padx=10, pady=10)
+			self.custom_time_input_frame.grid(row=1, column=0, padx=10, pady=10, sticky='ne')
 		else:
 			self.custom_time_input_frame.grid_forget()
-
-
 
 	def confirm_date_selection(self):
 		self.assign_chosen_projects()
