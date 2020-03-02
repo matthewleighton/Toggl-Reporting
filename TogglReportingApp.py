@@ -1,11 +1,14 @@
 """
 #To Do List:
+- Ability to select "All Projects", giving a graph which just shows total time tracked.
 - Button to select all/no projects
 - Set a default selected time span
 - Add title to graph, showing timespan.
 - Search by client
 - Some kind of search via tags
 - Mark description as "NOT". Something which would allow a graph of "X vs other"
+- Ability to save/load different configurations of settings
+- Ability to manually enter Toggl info to login, and switch between accounts.
 """
 
 import time
@@ -29,6 +32,7 @@ import config
 
 import math
 from operator import itemgetter
+import pprint
 
 LARGE_FONT = ("Verdana", 12)
 
@@ -441,8 +445,11 @@ class StartPage(tk.Frame):
 		for i in group_by_options:
 			self.group_by_listbox.insert(END, i)
 
+		current_group_by = self.controller.group_by
+		current_group_by_id = self.group_by_listbox.get(0, END).index(current_group_by)
+
 		self.group_by_listbox.bind('<<ListboxSelect>>', self.check_group_by_selection)
-		self.group_by_listbox.select_set(0)
+		self.group_by_listbox.select_set(current_group_by_id)
 		self.check_group_by_selection()
 		self.group_by_listbox.pack()
 		self.group_by_frame.grid(row=0, column=0, sticky='w')
@@ -475,11 +482,39 @@ class StartPage(tk.Frame):
 
 		self.description_grouping_listboxes = []
 
-		column = 0
-		for description in description_list:
-			self.create_description_grouping_listbox(description, column)
-			column += 1
+		existing_description_groupings = controller.description_groupings
 
+		column = 0
+		if len(existing_description_groupings) == 0:
+			for description in description_list:
+				self.create_description_grouping_listbox(description, column)
+				column += 1	
+		else:
+			old_descriptions = []
+			for grouping in existing_description_groupings:
+				descriptions = list(grouping['descriptions'])
+
+				# Ignore descriptions which have been removed from the description list by the user.
+				for description in descriptions:
+					if not description in description_list:
+						descriptions.remove(description)
+
+				title = grouping['title']
+				self.create_description_grouping_listbox(descriptions, column, title)
+				
+				old_descriptions.extend(descriptions)
+				column += 1
+
+			new_descriptions = list(set(description_list)-(set(old_descriptions)))
+
+			for description in new_descriptions:
+				self.create_description_grouping_listbox(description, column)
+				column += 1
+
+			while column < len(description_list):
+				self.create_description_grouping_listbox([], column)
+				column += 1
+				
 		move_description_buttons = Frame(self.description_grouping_frame)
 
 		left_button = ttk.Button(move_description_buttons, text="<<", command=lambda: self.move_description('left'))
@@ -492,16 +527,26 @@ class StartPage(tk.Frame):
 
 		self.description_grouping_frame.grid(row=5, column=0, sticky='w')
 
-	def create_description_grouping_listbox(self, description, column):
+	def create_description_grouping_listbox(self, descriptions, column, title=False):
 		frame = Frame(self.description_grouping_frame)
 
+		if not title:
+			title = descriptions
+
 		entry = Entry(frame)
-		entry.insert(0, description)
+		entry.insert(0, title)
 		entry.config(state='disabled')
 		entry.pack()
 
+		if isinstance(descriptions, str):
+			description = descriptions
+			descriptions = [description]
+
 		listbox = Listbox(frame, selectmode=SINGLE, exportselection=True)
-		listbox.insert(END, description)
+		
+		for description in descriptions:
+			listbox.insert(END, description)	
+
 		listbox.pack()
 
 		frame.grid(row=0, column=column)
