@@ -1,5 +1,7 @@
 """
 #To Do List:
+- !!! Refactor code to join together project and client functions. Much of this is the same, and can be combined !!!
+- Add "No Client" client, to include projects with no client. Currently they're being excluded.
 - Make it more efficient by only grabbing all the data once upon login. We don't need to be making new requests for every graph.
 - Ability to show multiple graphs at once
 - Rename "More Settings" button to "Grouping Settings"
@@ -12,6 +14,7 @@
 - Add "Ignore" tickbox next to each description. To temporarily disable it.
 - Option to add 'Now' line onto graph
 - Multiple time frames, and group by time frame. So we can see how tracking changes in span 1 vs span 2.
+- If a line is at zero across the whole graph, remove it. (?)
 """
 
 import time
@@ -349,15 +352,47 @@ class StartPage(tk.Frame):
 		self.time_frame_frame.grid(row=1, column=0, padx=10, pady=10, sticky='nw')
 
 		self.time_frame_select = Listbox(self.time_frame_frame, selectmode=SINGLE, exportselection=False)
+		self.time_frame_select.grid(row=1, column=0, padx=10, pady=10)
 
 		for i in self.controller.preset_date_bounds:
 			self.time_frame_select.insert(END, i)
 
-		self.time_frame_select.bind('<<ListboxSelect>>', self.check_if_custom_time_frame_selected)
+		self.time_frame_select.bind('<<ListboxSelect>>', self.time_frame_updated)
 
-		self.time_frame_select.select_set(3) # Default to past year
+		self.time_frame_select.select_set(3) # Default to past year. TODO: Shouldn't depend on specific ID.
 
-		self.time_frame_select.grid(row=1, column=0, padx=10, pady=10)
+		self.time_frame_updated()
+
+		
+
+	def get_listbox_value(self, listbox):
+		return listbox.get(listbox.curselection())
+
+	def time_frame_updated(self, *args):
+		listbox = self.time_frame_select
+
+		selected_time_frame = self.get_listbox_value(listbox)
+		using_custom_time_frame = True if selected_time_frame == 'Custom' else False
+		self.toggle_custom_date_input(using_custom_time_frame)
+
+		date_bounds = self.get_date_bounds_from_time_frame(selected_time_frame)
+
+		self.selected_time_frame = selected_time_frame
+
+	def get_date_bounds_from_time_frame(self, date_bounds):
+		number_of_days = self.controller.preset_date_bounds[date_bounds]
+
+		self.date_bounds = {
+			'start': datetime.now() - timedelta(days=number_of_days),
+			'end': datetime.now()
+		}
+
+	# Hide/show the custom date input box	
+	def toggle_custom_date_input(self, value):
+		if value == True:
+			self.custom_time_input_frame.grid(row=1, column=0, padx=10, pady=10, sticky='ne')
+		else:
+			self.custom_time_input_frame.grid_forget()
 
 	# Create the frame for the input of custom time bounds.
 	def create_custom_time_input(self):
@@ -368,12 +403,20 @@ class StartPage(tk.Frame):
 
 		self.start_select = DateEntry(self.custom_time_input_frame)
 		self.start_select.grid(row=0, column=1, padx=10, pady=10)
+		self.start_select.bind('<<DateEntrySelected>>', self.update_custom_time_frame_values)
 
 		self.end_label = ttk.Label(self.custom_time_input_frame, text="End Date:")
 		self.end_label.grid(row=1, column=0, padx=10, pady=10)
 
 		self.end_select = DateEntry(self.custom_time_input_frame)
 		self.end_select.grid(row=1, column=1, padx=10, pady=10)
+		self.end_select.bind('<<DateEntrySelected>>', self.update_custom_time_frame_values)
+
+	def update_custom_time_frame_values(self, virtual_event):
+		self.date_bounds = {
+			'start': self.start_select.get_date(),
+			'end': self.end_select.get_date()
+		}
 
 	def create_projects_select(self):
 		self.project_selector_frame = LabelFrame(self, text="Projects", padx=10, pady=10)
@@ -721,34 +764,16 @@ class StartPage(tk.Frame):
 			entry.config(state='disabled')
 
 	def create_create_graph_button(self):
-		create_graph_button = ttk.Button(self, text="Create Graph", command=self.confirm_date_selection)
+		create_graph_button = ttk.Button(self, text="Create Graph", command=self.confirm_user_selection)
 		create_graph_button.grid(row=2, column=3, padx=10, pady=10, sticky='se')
 
-
-	# Check if the user has selected a custom time frame. If so, display the custom time input frame.
-	def check_if_custom_time_frame_selected(self, callback_value):
-		custom_selected = self.using_custom_date_bounds()
-		self.toggle_custom_date_input(custom_selected)
-
-	# Return True/False for whether the user has selected a custom time frame.
-	def using_custom_date_bounds(self):
-		return self.time_frame_select.select_includes(END)
-
-	# Hide/show the custom date input box	
-	def toggle_custom_date_input(self, value):
-		if value == True:
-			self.custom_time_input_frame.grid(row=1, column=0, padx=10, pady=10, sticky='ne')
-		else:
-			self.custom_time_input_frame.grid_forget()
-
-	def confirm_date_selection(self):
+	# The user has finished inputting values. Now begin the work of generating the graph.
+	def confirm_user_selection(self):
 		self.assign_chosen_projects()
 		self.assign_chosen_clients()
 
-		date_bounds = self.get_date_bounds()
-
 		# Split the request into several with a max length of one year. (Toggl API only allows reports of max 1 year length)
-		split_bounds = self.split_date_bounds(date_bounds)
+		split_bounds = self.split_date_bounds(self.date_bounds)
 
 		# A list of all the reports we gather from Toggl. (Max 1 year each)
 		reports = []
@@ -791,24 +816,6 @@ class StartPage(tk.Frame):
 			self.controller.client_list[client_name] = self.controller.master_client_list[client_name]
 
 		self.controller.show_frame(StartPage)
-
-	# Return the start and end date for the bounds that the user has selected.
-	def get_date_bounds(self):
-		if self.using_custom_date_bounds():
-			dates = {
-				'start': self.start_select.get_date(),
-				'end': self.end_select.get_date()
-			}
-		else:
-			string_selected = self.time_frame_select.get(self.time_frame_select.curselection())
-			day_count = self.controller.preset_date_bounds[string_selected]
-
-			dates = {
-				'start': datetime.now() - timedelta(days=day_count),
-				'end': datetime.now()
-			}
-
-		return dates
 
 	# Return a list containing a series of bounds, each of at most 1 year long.
 	def split_date_bounds(self, bounds):
