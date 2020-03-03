@@ -97,7 +97,7 @@ class TogglReportingApp(tk.Tk):
 		project_data_dict = {project_data[i]['name']: project_data[i] for i in range(0, len(project_data))}
 
 		self.master_project_list = project_data_dict # Unchanging "master" list
-		self.project_list 		 = project_data_dict # List of active projects to be displayed in the graph
+		self.project_list 		 = project_data_dict.copy().keys() # List of active projects to be displayed in the graph
 
 		client_data 	 = self.user_data['data']['clients']
 		client_data_dict = {client_data[i]['name']: client_data[i] for i in range(0, len(client_data))}
@@ -170,13 +170,97 @@ class TogglReportingApp(tk.Tk):
 		else:
 			return False
 
-	def main_sequence(self, params, report):
+	def main_sequence(self):
+		self.update_project_data()
+		self.update_client_data()
 		self.update_description_restrictions()
+
+		report = self.get_report_from_toggl()
 
 		day = self.get_day()
 		day = self.populate_day(day, report)
 
 		self.create_graph(day)
+
+	def update_project_data(self):
+		user_selection = self.project_list
+		self.project_list = {}
+
+		for project_name in user_selection:
+			self.project_list[project_name] = self.master_project_list[project_name]
+
+	def update_client_data(self):
+		user_selection = self.client_list
+		self.client_list = {}
+
+		for client_name in user_selection:
+			self.client_list[client_name] = self.master_client_list[client_name]
+
+
+	def get_report_from_toggl(self):
+		# Split the request into several with a max length of one year. (Toggl API only allows reports of max 1 year length)
+		split_bounds = self.split_date_bounds(self.date_bounds)
+
+		# A list of all the reports we gather from Toggl. (Max 1 year each)
+		reports = []
+
+		for bounds in split_bounds:
+			params = {
+				'start': bounds['start'],
+				'end': bounds['end']
+			}
+
+			reports.append(app.get_report(params))
+
+		return self.join_reports(reports)
+
+	# Return a list containing a series of bounds, each of at most 1 year long.
+	def split_date_bounds(self, bounds):
+		span = self.get_report_span(bounds['start'], bounds['end'])
+
+		number_of_years = math.ceil(span/365)
+
+		bounds = []
+
+		for year in range(number_of_years):
+			remaining_days_after_subtraction = span - 365
+			
+			start = datetime.now() - timedelta(days = span)
+
+			if (remaining_days_after_subtraction > 0):
+				span = remaining_days_after_subtraction	
+				end = datetime.now() - timedelta(days = span + 1) #(Plus 1 so we don't get an overlap at the edge of the bounds)
+			else:
+				end = datetime.now()
+
+			bounds.append(
+				{
+					'start': start,
+					'end': end
+				}
+			)
+
+		return bounds
+
+	# Return the length of time that a report covers. (In days)
+	def get_report_span(self, start, end):
+		span = end - start
+		return span.days
+
+	# Join the given reports together, saving them as a temporary csv file.
+	def join_reports(self, reports_list):
+		filename = 'test.csv'
+
+		test = ''
+
+		temporary_csv_file = tempfile.NamedTemporaryFile()
+
+		for report in reports_list:
+
+			with open(temporary_csv_file.name, 'ab') as csv:
+				csv.write(report)
+
+		return temporary_csv_file
 
 	def update_description_restrictions(self):
 		self.allowed_descriptions = []
@@ -339,39 +423,49 @@ class StartPage(tk.Frame):
 		self.controller = controller
 
 		self.create_custom_time_input()
-		self.create_time_frame_select()
-		self.create_projects_select()
+		self.create_time_frame_listbox()
+		self.create_projects_frame()
 		self.create_client_select()
 		self.create_description_search()
 		self.create_more_settings_button()
 		self.create_create_graph_button()
 
 	# Create the input selector for the time frame.
-	def create_time_frame_select(self):
+	def create_time_frame_listbox(self):
 		self.time_frame_frame = LabelFrame(self, text="Time Frame")
 		self.time_frame_frame.grid(row=1, column=0, padx=10, pady=10, sticky='nw')
 
-		self.time_frame_select = Listbox(self.time_frame_frame, selectmode=SINGLE, exportselection=False)
-		self.time_frame_select.grid(row=1, column=0, padx=10, pady=10)
+		self.time_frame_listbox = Listbox(self.time_frame_frame, selectmode=SINGLE, exportselection=False)
+		self.time_frame_listbox.grid(row=1, column=0, padx=10, pady=10)
 
 		for i in self.controller.preset_date_bounds:
-			self.time_frame_select.insert(END, i)
+			self.time_frame_listbox.insert(END, i)
 
-		self.time_frame_select.bind('<<ListboxSelect>>', self.time_frame_updated)
+		self.time_frame_listbox.bind('<<ListboxSelect>>', self.time_frame_updated)
 
-		self.time_frame_select.select_set(3) # Default to past year. TODO: Shouldn't depend on specific ID.
+		self.time_frame_listbox.select_set(3) # Default to past year. TODO: Shouldn't depend on specific ID.
 
 		self.time_frame_updated()
 
-		
-
 	def get_listbox_value(self, listbox):
-		return listbox.get(listbox.curselection())
+		selected_ids = listbox.curselection()
+
+		selected_names = []
+
+		for id in selected_ids:
+			selected_names.append(listbox.get(id))
+
+		return selected_names
+
+		if len(selected_names) == 1:
+			return selected_names[0]
+		else:
+			return selected_names
 
 	def time_frame_updated(self, *args):
-		listbox = self.time_frame_select
+		listbox = self.time_frame_listbox
 
-		selected_time_frame = self.get_listbox_value(listbox)
+		selected_time_frame = self.get_listbox_value(listbox)[0]
 		using_custom_time_frame = True if selected_time_frame == 'Custom' else False
 		self.toggle_custom_date_input(using_custom_time_frame)
 
@@ -382,7 +476,7 @@ class StartPage(tk.Frame):
 	def get_date_bounds_from_time_frame(self, date_bounds):
 		number_of_days = self.controller.preset_date_bounds[date_bounds]
 
-		self.date_bounds = {
+		self.controller.date_bounds = {
 			'start': datetime.now() - timedelta(days=number_of_days),
 			'end': datetime.now()
 		}
@@ -418,7 +512,7 @@ class StartPage(tk.Frame):
 			'end': self.end_select.get_date()
 		}
 
-	def create_projects_select(self):
+	def create_projects_frame(self):
 		self.project_selector_frame = LabelFrame(self, text="Projects", padx=10, pady=10)
 
 		sort_orders = ['Time Tracked', 'Alphabetical']
@@ -426,60 +520,120 @@ class StartPage(tk.Frame):
 		self.project_sort_order.set(sort_orders[0])
 		self.project_sort_order.trace('w', self.populate_project_listbox)
 
-		self.project_sort_order_select = OptionMenu(self.project_selector_frame, self.project_sort_order, *sort_orders)
-		self.project_sort_order_select.grid(row=0, column=0, pady=5)
+		self.project_sort_order_dropdown = OptionMenu(self.project_selector_frame, self.project_sort_order, *sort_orders)
+		self.project_sort_order_dropdown.grid(row=0, column=0, pady=5)
 
-		self.project_selector = Listbox(self.project_selector_frame, selectmode=MULTIPLE, exportselection=False)
+		self.project_listbox = Listbox(self.project_selector_frame, selectmode=MULTIPLE, exportselection=False)
+		self.project_listbox.grid(row=1, column=0)
+		self.project_listbox.bind('<<ListboxSelect>>', self.project_listbox_updated)
 		self.populate_project_listbox()
-		self.project_selector.grid(row=1, column=0)
+		
 
 		self.projects_select_all_button = ttk.Button(self.project_selector_frame, text="Select All", command=self.toggle_all_projects)
 		self.projects_select_all_button.grid(row=2, column=0, padx=10, pady=10)
 
 		self.project_selector_frame.grid(row=1, column=3, padx=10, pady=10)
 
+	def project_listbox_updated(self, virtual_event):
+		self.controller.project_list = self.get_listbox_value(self.project_listbox)
+
 	def create_client_select(self):
-		self.client_selector_frame = LabelFrame(self, text='Clients', padx=10, pady=10)
-		self.client_selector_frame.grid(row=1, column=4, padx=10, pady=10)
+		self.client_listbox_frame = LabelFrame(self, text='Clients', padx=10, pady=10)
+		self.client_listbox_frame.grid(row=1, column=4, padx=10, pady=10)
 
-		self.client_selector = Listbox(self.client_selector_frame, selectmode=MULTIPLE, exportselection=False)
+		self.client_listbox = Listbox(self.client_listbox_frame, selectmode=MULTIPLE, exportselection=False)
 		self.populate_client_listbox()
-		self.client_selector.grid(row=1, column=0)
+		self.client_listbox.grid(row=1, column=0)
+		self.client_listbox.bind('<<ListboxSelect>>', self.client_listbox_updated)
 
-		self.clients_select_all_button = ttk.Button(self.client_selector_frame, text="Select None", command=self.toggle_all_clients)
+		self.clients_select_all_button = ttk.Button(self.client_listbox_frame, text="Select None", command=self.toggle_all_clients)
 		self.clients_select_all_button.grid(row=2, column=0, padx=10, pady=10)
 
 	def populate_client_listbox(self):
-		self.client_selector.delete(0, END)
+		self.client_listbox.delete(0, END)
 
 		client_list = self.controller.master_client_list
 
 		client_list = sorted(client_list.values(), key=itemgetter('name'))
 
 		for client in client_list:
-			self.client_selector.insert(END, client['name'])
+			self.client_listbox.insert(END, client['name'])
 
-		self.client_selector.select_set(0, END) # Select all clients by default.
+		self.client_listbox.select_set(0, END) # Select all clients by default.
+
+	def client_listbox_updated(self, virtual_event=False):
+		self.controller.client_list = self.get_listbox_value(self.client_listbox)
+
+		number_of_total_clients = len(self.controller.master_client_list)
+		number_of_selected_clients = len(self.controller.client_list)
+		button = self.clients_select_all_button
+
+		if number_of_selected_clients == number_of_total_clients:
+			button.config(text = 'Select None')
+		else:
+			button.config(text = 'Select All')
+
+		self.hide_nonclient_projects()
+
+	def hide_nonclient_projects(self):
+		all_projects = self.controller.master_project_list
+		selected_clients = self.controller.client_list
+
+		client_projects = []
+
+		for project_data in all_projects.values():
+			if project_data['client'] in selected_clients:
+				client_projects.append(project_data['name'])
+
+		self.populate_project_listbox(project_list = client_projects)
+
+
+	def get_project_client(self, project_name):
+		project_data = self.controller.master_project_list[project_name]
+		return project_data['client']
 
 	# Populate the projects selector list, according to the chosen sort order.
-	def populate_project_listbox(self, *args):
-		self.project_selector.delete(0, END) # Remove old contents of list.
+	def populate_project_listbox(self, *virtual_event, project_list = False):
+		listbox = self.project_listbox
+		original_project_selection = self.get_listbox_value(listbox)
 
-		sort_order 	  = self.project_sort_order.get()
-		selector_list = self.controller.master_project_list
+		self.project_listbox.delete(0, END) # Remove old contents of list.
+
+		sort_order = self.project_sort_order.get()
+
+		if project_list == False:
+			project_list = self.controller.master_project_list
+		else:
+			project_list_dict = {}
+
+			master_project_list = self.controller.master_project_list
+			for project_name in master_project_list:
+				if project_name in project_list:
+					project_list_dict[project_name] = master_project_list[project_name]	
+				
+			project_list = project_list_dict
+
 
 		if sort_order == 'Alphabetical':
-			selector_list = sorted(selector_list.values(), key=itemgetter('name'))
+			project_list = sorted(project_list.values(), key=itemgetter('name'))
 		else:
-			selector_list = sorted(selector_list.values(), key=itemgetter('actual_hours'))
-			selector_list.reverse()
+			project_list = sorted(project_list.values(), key=itemgetter('actual_hours'))
+			project_list.reverse()
 
-		for project in selector_list:
-			self.project_selector.insert(END, project['name'])
+		for project in project_list:
+			self.project_listbox.insert(END, project['name'])
+
+		visible_projects = listbox.get(0, END)
+		
+		i = 0
+		for project in visible_projects:
+			if project in original_project_selection:
+				listbox.select_set(i)
+			i += 1
 
 	# Select all/none of the projects, depending on the current selection state
 	def toggle_all_projects(self):
-		listbox = self.project_selector
+		listbox = self.project_listbox
 		button = self.projects_select_all_button
 
 		number_of_projects = listbox.size()
@@ -493,7 +647,7 @@ class StartPage(tk.Frame):
 			button.config(text = 'Select None')
 
 	def toggle_all_clients(self):
-		listbox = self.client_selector
+		listbox = self.client_listbox
 		button = self.clients_select_all_button
 
 		number_of_clients = listbox.size()
@@ -503,8 +657,10 @@ class StartPage(tk.Frame):
 			listbox.selection_clear(0, END)
 			button.config(text = 'Select All')
 		else: # Select all clients
-			listbox.select_set(0, END)
-			button.config(text = 'Select None')		
+			listbox.selection_set(0, END)
+			button.config(text = 'Select None')
+
+		self.client_listbox_updated(from_toggle_button = True)		
 
 	def create_description_search(self):
 		self.description_search_frame = LabelFrame(self, text='Description', padx=10, pady=10)
@@ -769,101 +925,16 @@ class StartPage(tk.Frame):
 
 	# The user has finished inputting values. Now begin the work of generating the graph.
 	def confirm_user_selection(self):
-		self.assign_chosen_projects()
-		self.assign_chosen_clients()
-
-		# Split the request into several with a max length of one year. (Toggl API only allows reports of max 1 year length)
-		split_bounds = self.split_date_bounds(self.date_bounds)
-
-		# A list of all the reports we gather from Toggl. (Max 1 year each)
-		reports = []
-
-		for bounds in split_bounds:
-			params = {
-				'start': bounds['start'],
-				'end': bounds['end']
-			}
-
-			reports.append(app.get_report(params))
-
-		joined_report = self.join_reports(reports)
-
-		app.main_sequence(params, joined_report)
-
-	# Assign the user's chosen projects to the controller's active project list.
-	def assign_chosen_projects(self):
-		chosen_projects 	= [self.project_selector.get(idx) for idx in self.project_selector.curselection()]
-		chosen_clients 		= [self.client_selector.get(idx) for idx in self.client_selector.curselection()]
-		master_project_list = self.controller.master_project_list
-
-		self.controller.project_list = {} # Emptying the project list
-
-		for project_name in chosen_projects:
-			project_data = master_project_list[project_name]
-
-			project_client = project_data['client']
-			
-			if project_client in chosen_clients:
-				self.controller.project_list[project_name] = master_project_list[project_name]
-
-		self.controller.show_frame(StartPage)
+		self.controller.main_sequence()
 
 	def assign_chosen_clients(self):
-		chosen_clients = [self.client_selector.get(idx) for idx in self.client_selector.curselection()]
+		chosen_clients = [self.client_listbox.get(idx) for idx in self.client_listbox.curselection()]
 		self.controller.client_list = {}
 
 		for client_name in chosen_clients:
 			self.controller.client_list[client_name] = self.controller.master_client_list[client_name]
 
 		self.controller.show_frame(StartPage)
-
-	# Return a list containing a series of bounds, each of at most 1 year long.
-	def split_date_bounds(self, bounds):
-		span = self.get_report_span(bounds['start'], bounds['end'])
-
-		number_of_years = math.ceil(span/365)
-
-		bounds = []
-
-		for year in range(number_of_years):
-			remaining_days_after_subtraction = span - 365
-			
-			start = datetime.now() - timedelta(days = span)
-
-			if (remaining_days_after_subtraction > 0):
-				span = remaining_days_after_subtraction	
-				end = datetime.now() - timedelta(days = span + 1) #(Plus 1 so we don't get an overlap at the edge of the bounds)
-			else:
-				end = datetime.now()
-
-			bounds.append(
-				{
-					'start': start,
-					'end': end
-				}
-			)
-
-		return bounds
-
-	# Return the length of time that a report covers. (In days)
-	def get_report_span(self, start, end):
-		span = end - start
-		return span.days
-
-	# Join the given reports together, saving them as a temporary csv file.
-	def join_reports(self, reports_list):
-		filename = 'test.csv'
-
-		test = ''
-
-		temporary_csv_file = tempfile.NamedTemporaryFile()
-
-		for report in reports_list:
-
-			with open(temporary_csv_file.name, 'ab') as csv:
-				csv.write(report)
-
-		return temporary_csv_file
 
 app = TogglReportingApp()
 
