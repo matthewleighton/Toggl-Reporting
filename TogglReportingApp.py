@@ -529,12 +529,14 @@ class StartPage(tk.Frame):
 		self.populate_project_listbox()
 		
 
-		self.projects_select_all_button = ttk.Button(self.project_selector_frame, text="Select All", command=self.toggle_all_projects)
+		#command=lambda: self.delete_description_search(description_id, entry)
+
+		self.projects_select_all_button = ttk.Button(self.project_selector_frame, text="Select All", command=lambda: self.toggle_all('project'))
 		self.projects_select_all_button.grid(row=2, column=0, padx=10, pady=10)
 
 		self.project_selector_frame.grid(row=1, column=3, padx=10, pady=10)
 
-	def project_listbox_updated(self, virtual_event):
+	def project_listbox_updated(self, virtual_event=False):
 		self.controller.project_list = self.get_listbox_value(self.project_listbox)
 
 	def create_client_select(self):
@@ -546,7 +548,7 @@ class StartPage(tk.Frame):
 		self.client_listbox.grid(row=1, column=0)
 		self.client_listbox.bind('<<ListboxSelect>>', self.client_listbox_updated)
 
-		self.clients_select_all_button = ttk.Button(self.client_listbox_frame, text="Select None", command=self.toggle_all_clients)
+		self.clients_select_all_button = ttk.Button(self.client_listbox_frame, text="Select None", command=lambda: self.toggle_all('client'))
 		self.clients_select_all_button.grid(row=2, column=0, padx=10, pady=10)
 
 	def populate_client_listbox(self):
@@ -631,36 +633,23 @@ class StartPage(tk.Frame):
 				listbox.select_set(i)
 			i += 1
 
-	# Select all/none of the projects, depending on the current selection state
-	def toggle_all_projects(self):
-		listbox = self.project_listbox
-		button = self.projects_select_all_button
+	# Toggle the selection of projects or clients, depending on value of category_type.
+	def toggle_all(self, category_type):
+		listbox = getattr(self, category_type + '_listbox')
+		button = getattr(self, category_type + 's_select_all_button')
 
-		number_of_projects = listbox.size()
+		number_in_category = listbox.size()
 		number_selected = len(listbox.curselection())
 
-		if number_selected == number_of_projects: # Unselect all projects
+		if number_selected == number_in_category: # Unselect all projects
 			listbox.selection_clear(0, END)
 			button.config(text = 'Select All')
 		else: # Select all projects
 			listbox.select_set(0, END)
 			button.config(text = 'Select None')
 
-	def toggle_all_clients(self):
-		listbox = self.client_listbox
-		button = self.clients_select_all_button
-
-		number_of_clients = listbox.size()
-		number_selected = len(listbox.curselection())
-
-		if number_selected == number_of_clients: # Unselect all clients
-			listbox.selection_clear(0, END)
-			button.config(text = 'Select All')
-		else: # Select all clients
-			listbox.selection_set(0, END)
-			button.config(text = 'Select None')
-
-		self.client_listbox_updated(from_toggle_button = True)		
+		update_function = getattr(self, category_type + '_listbox_updated')
+		update_function()
 
 	def create_description_search(self):
 		self.description_search_frame = LabelFrame(self, text='Description', padx=10, pady=10)
