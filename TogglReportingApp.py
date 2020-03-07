@@ -203,8 +203,6 @@ class TogglReportingApp(tk.Tk):
 		# Split the request into several with a max length of one year. (Toggl API only allows reports of max 1 year length)
 		split_bounds = self.split_date_bounds(self.date_bounds)
 
-		print(split_bounds)
-
 		# A list of all the reports we gather from Toggl. (Max 1 year each)
 		reports = []
 
@@ -368,6 +366,20 @@ class TogglReportingApp(tk.Tk):
 					elif self.group_by == 'None':
 						day[targetMinute] += 1
 
+		day = self.remove_empty_categories(day)
+
+		return day
+
+	# Remove all the categories from a day which have zero minutes tracked over the time span.
+	def remove_empty_categories(self, day):
+		empty_categories = []
+		for category_name in day:
+			if all(value == 0 for value in day[category_name].values()):
+				empty_categories.append(category_name)
+		
+		for category_name in empty_categories:
+			del day[category_name]
+
 		return day
 
 	def getTimeInMinutes(self, time):
@@ -382,7 +394,7 @@ class TogglReportingApp(tk.Tk):
 
 	def create_graph(self, day):
 		if self.group_by == 'Project':
-			for project_name in self.project_list:
+			for project_name in day:
 
 				hex_color = self.project_list[project_name]['hex_color']
 
