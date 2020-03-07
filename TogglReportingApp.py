@@ -1,5 +1,6 @@
 """
 #To Do List:
+- Hide any projects from graph which are zero throughout.
 - !!! Refactor code to join together project and client functions. Much of this is the same, and can be combined !!!
 - Add "No Client" client, to include projects with no client. Currently they're being excluded.
 - Make it more efficient by only grabbing all the data once upon login. We don't need to be making new requests for every graph.
@@ -201,6 +202,8 @@ class TogglReportingApp(tk.Tk):
 	def get_report_from_toggl(self):
 		# Split the request into several with a max length of one year. (Toggl API only allows reports of max 1 year length)
 		split_bounds = self.split_date_bounds(self.date_bounds)
+
+		print(split_bounds)
 
 		# A list of all the reports we gather from Toggl. (Max 1 year each)
 		reports = []
@@ -466,21 +469,31 @@ class StartPage(tk.Frame):
 	def time_frame_updated(self, *args):
 		listbox = self.time_frame_listbox
 
-		selected_time_frame = self.get_listbox_value(listbox)[0]
-		using_custom_time_frame = True if selected_time_frame == 'Custom' else False
+		selected_time_frame_name = self.get_listbox_value(listbox)[0]
+
+		using_custom_time_frame = True if selected_time_frame_name == 'Custom' else False
 		self.toggle_custom_date_input(using_custom_time_frame)
 
-		date_bounds = self.get_date_bounds_from_time_frame(selected_time_frame)
+		self.controller.date_bounds = self.get_date_bounds_from_time_frame(selected_time_frame_name)
 
-		self.selected_time_frame = selected_time_frame
+		self.selected_time_frame = selected_time_frame_name
 
-	def get_date_bounds_from_time_frame(self, date_bounds):
-		number_of_days = self.controller.preset_date_bounds[date_bounds]
+	def get_date_bounds_from_time_frame(self, time_frame_name):
+		number_of_days = self.controller.preset_date_bounds[time_frame_name]
 
-		self.controller.date_bounds = {
-			'start': datetime.now() - timedelta(days=number_of_days),
-			'end': datetime.now()
-		}
+		if time_frame_name == 'Custom':
+			date_bounds = {
+				'start': self.start_select.get_date(),
+				'end': self.end_select.get_date()
+			}
+		else:
+			date_bounds = {
+				'start': datetime.now() - timedelta(days=number_of_days),
+				'end': datetime.now()
+			}
+
+		return date_bounds
+
 
 	# Hide/show the custom date input box	
 	def toggle_custom_date_input(self, value):
@@ -498,20 +511,14 @@ class StartPage(tk.Frame):
 
 		self.start_select = DateEntry(self.custom_time_input_frame)
 		self.start_select.grid(row=0, column=1, padx=10, pady=10)
-		self.start_select.bind('<<DateEntrySelected>>', self.update_custom_time_frame_values)
+		self.start_select.bind('<<DateEntrySelected>>', self.time_frame_updated)
 
 		self.end_label = ttk.Label(self.custom_time_input_frame, text="End Date:")
 		self.end_label.grid(row=1, column=0, padx=10, pady=10)
 
 		self.end_select = DateEntry(self.custom_time_input_frame)
 		self.end_select.grid(row=1, column=1, padx=10, pady=10)
-		self.end_select.bind('<<DateEntrySelected>>', self.update_custom_time_frame_values)
-
-	def update_custom_time_frame_values(self, virtual_event):
-		self.date_bounds = {
-			'start': self.start_select.get_date(),
-			'end': self.end_select.get_date()
-		}
+		self.end_select.bind('<<DateEntrySelected>>', self.time_frame_updated)
 
 	def create_projects_frame(self):
 		self.project_selector_frame = LabelFrame(self, text="Projects", padx=10, pady=10)
@@ -528,9 +535,6 @@ class StartPage(tk.Frame):
 		self.project_listbox.grid(row=1, column=0)
 		self.project_listbox.bind('<<ListboxSelect>>', self.project_listbox_updated)
 		self.populate_project_listbox()
-		
-
-		#command=lambda: self.delete_description_search(description_id, entry)
 
 		self.projects_select_all_button = ttk.Button(self.project_selector_frame, text="Select All", command=lambda: self.toggle_all('project'))
 		self.projects_select_all_button.grid(row=2, column=0, padx=10, pady=10)
@@ -575,8 +579,6 @@ class StartPage(tk.Frame):
 			button.config(text = 'Select None')
 		else:
 			button.config(text = 'Select All')
-
-
 
 		client_projects = self.get_client_projects()
 		self.populate_project_listbox(project_list = client_projects)
