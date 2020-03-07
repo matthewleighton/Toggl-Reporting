@@ -116,7 +116,8 @@ class TogglReportingApp(tk.Tk):
 				elif self.master_project_list[project_name]['cid'] == client_id:
 					self.master_project_list[project_name]['client'] = client_name
 
-		self.project_list = self.master_project_list
+		#self.project_list = list(self.master_project_list.keys())
+		self.project_list = []
 
 	# Return a version of the project list, where all projects without any tracked hours are removed.
 	# (This also removes projects which have been deleted via Toggl, but are still retrieved via the API)
@@ -282,7 +283,7 @@ class TogglReportingApp(tk.Tk):
 
 	# Return an dictionary containing projects with minutes set to zero.
 	def get_day(self):
-		minutesInDay = 60*24
+		minutesInDay = (60*24)-1 #Subtract 1 because it is zero indexed. Minute 1440 is the following midnight, which will be empty.
 		day = {}
 		emptyDay = {}
 
@@ -575,9 +576,28 @@ class StartPage(tk.Frame):
 		else:
 			button.config(text = 'Select All')
 
-		self.hide_nonclient_projects()
 
-	def hide_nonclient_projects(self):
+
+		client_projects = self.get_client_projects()
+		self.populate_project_listbox(project_list = client_projects)
+		self.project_listbox_updated()
+
+		#TODO - Fix toggle buttons. Maybe write new function: change_toggle_behavior, which takes a button and all/none as argument.
+
+		number_of_client_projects = len(client_projects)
+		number_of_selected_projects = len(self.controller.project_list)
+		button = self.projects_select_all_button
+
+		print('Number selected: ', number_of_selected_projects)
+		print('Number client: ', number_of_client_projects)
+		
+		if number_of_selected_projects == number_of_client_projects:
+			button.config(text = 'Select None')
+		else:
+			button.config(text = 'Select All')
+		
+
+	def get_client_projects(self):
 		all_projects = self.controller.master_project_list
 		selected_clients = self.controller.client_list
 
@@ -587,8 +607,7 @@ class StartPage(tk.Frame):
 			if project_data['client'] in selected_clients:
 				client_projects.append(project_data['name'])
 
-		self.populate_project_listbox(project_list = client_projects)
-
+		return client_projects
 
 	def get_project_client(self, project_name):
 		project_data = self.controller.master_project_list[project_name]
@@ -655,7 +674,6 @@ class StartPage(tk.Frame):
 		self.description_search_frame = LabelFrame(self, text='Description', padx=10, pady=10)
 
 		self.description_id = 1
-
 
 		self.controller.description_search_list = {}
 
