@@ -1,6 +1,5 @@
 """
 #To Do List:
-- Hide any projects from graph which are zero throughout.
 - !!! Refactor code to join together project and client functions. Much of this is the same, and can be combined !!!
 - Add "No Client" client, to include projects with no client. Currently they're being excluded.
 - Make it more efficient by only grabbing all the data once upon login. We don't need to be making new requests for every graph.
@@ -98,7 +97,7 @@ class TogglReportingApp(tk.Tk):
 		project_data_dict = {project_data[i]['name']: project_data[i] for i in range(0, len(project_data))}
 
 		self.master_project_list = project_data_dict # Unchanging "master" list
-		self.project_list 		 = project_data_dict.copy().keys() # List of active projects to be displayed in the graph
+		#self.project_list 		 = project_data_dict.copy().keys() # List of active projects to be displayed in the graph
 
 		client_data 	 = self.user_data['data']['clients']
 		client_data_dict = {client_data[i]['name']: client_data[i] for i in range(0, len(client_data))}
@@ -438,14 +437,157 @@ class StartPage(tk.Frame):
 		tk.Frame.__init__(self, parent)
 		self.controller = controller
 
-		self.create_custom_time_input()
-		self.create_time_frame_listbox()
+		self.create_time_frame_controls()
 		self.create_projects_frame()
 		self.create_client_select()
 		self.create_description_search()
 		self.create_more_settings_button()
 		self.create_create_graph_button()
 
+	def create_time_frame_controls(self):
+		time_frame_region = Frame(self)
+		time_frame_region.grid(row=0, column=0, sticky='nw')
+
+		time_frame_label = Label(time_frame_region, text='Time Frame: ')
+		time_frame_label.grid(row=0, column=0)
+
+		self.time_frames = []
+
+		self.current_timeframe_id = StringVar()
+		self.current_timeframe_id.trace('w', self.change_timeframe)
+
+		self.time_frame_dropdown = OptionMenu(time_frame_region, self.current_timeframe_id, value='test')
+		self.time_frame_dropdown.grid(row=0, column=1)
+
+		
+		
+		self.new_time_frame()
+		self.update_time_frames_dropdown()
+
+		#self.current_timeframe.set(self.time_frames[0])
+		self.current_timeframe_id.set(1)
+
+		
+		
+		
+
+
+
+		
+
+
+		new_time_frame_button = ttk.Button(time_frame_region, text="New Time Frame", command=self.new_time_frame)
+		new_time_frame_button.grid(row=0, column=2)
+
+
+		#self.time_frames = []
+
+		
+		
+
+	def update_time_frames_dropdown(self):
+		print('update_time_frames_dropdown')
+		menu = self.time_frame_dropdown['menu']
+
+		menu.delete(0, 'end')
+
+		
+		i = 1
+		print(len(self.time_frames))
+
+		for time_frame in self.time_frames:
+			print('loop')
+			menu.add_command(label=i, command=lambda value=i: self.current_timeframe_id.set(value))
+			i += 1
+
+
+
+	def new_time_frame(self):
+		frame = Frame(self)
+		frame.grid(row=1, column=0)
+		bounds =self.controller.preset_date_bounds
+
+		timeframe = {
+			'frame': frame,
+			'preset': self.create_time_frame_listbox(frame, bounds),
+			'custom': self.create_custom_time_entry(frame)
+		}
+
+		self.time_frames.append(timeframe)
+
+		self.update_time_frames_dropdown()
+
+		highest_current_timeframe_id = len(self.time_frames)
+		self.current_timeframe_id.set(highest_current_timeframe_id)
+
+
+		print(self.time_frames)
+
+
+		#self.create_custom_time_input()
+		#self.create_time_frame_listbox()
+
+	def create_time_frame_listbox(self, frame, bounds):
+
+		listbox = Listbox(frame, selectmode=SINGLE, exportselection=False)
+		listbox.grid(row=1, column=0, padx=10, pady=10)
+
+		for i in bounds:
+			listbox.insert(END, i)
+
+		#listbox.bind('<<ListboxSelect>>', lambda: self.time_frame_updated(listbox) )
+		listbox.bind('<<ListboxSelect>>', lambda event: self.time_frame_updated(listbox) )
+
+		listbox.select_set(3)
+
+		return listbox
+
+
+	def create_custom_time_entry(self, container_frame):
+		print('create_custom_time_entry')
+
+		frame = LabelFrame(container_frame, text="Custom Time Frame", padx=10, pady=10)
+
+		start_label = ttk.Label(frame, text="Start Date:")
+		start_label.grid(row=0, column=0, padx=10, pady=10)
+
+		start_select = DateEntry(frame)
+		start_select.grid(row=0, column=1, padx=10, pady=10)
+		start_select.bind('<<DateEntrySelected>>', self.time_frame_updated)
+
+		end_label = ttk.Label(frame, text="End Date:")
+		end_label.grid(row=1, column=0, padx=10, pady=10)
+
+		end_select = DateEntry(frame)
+		end_select.grid(row=1, column=1, padx=10, pady=10)
+		end_select.bind('<<DateEntrySelected>>', self.time_frame_updated)
+
+		return frame
+
+	def change_timeframe(self, *virtual_event):
+		print('change_timeframe')
+
+		current_timeframe_id = self.current_timeframe_id.get()
+		all_timeframes = self.time_frames
+		current_timeframe = all_timeframes[int(current_timeframe_id)-1]
+
+		print('Current Timeframe ID:')
+		print(current_timeframe_id)
+
+		print('All Timeframes:')
+		print(all_timeframes)
+
+		print('Current Timeframe:')
+		print(current_timeframe)
+
+		for timeframe in all_timeframes:
+			timeframe['frame'].grid_forget()
+
+		current_timeframe['frame'].grid(row=1, column=0)
+
+
+
+	"""
 	# Create the input selector for the time frame.
 	def create_time_frame_listbox(self):
 		self.time_frame_frame = LabelFrame(self, text="Time Frame")
@@ -462,6 +604,7 @@ class StartPage(tk.Frame):
 		self.time_frame_listbox.select_set(3) # Default to past year. TODO: Shouldn't depend on specific ID.
 
 		self.time_frame_updated()
+	"""
 
 	def get_listbox_value(self, listbox):
 		selected_ids = listbox.curselection()
@@ -478,16 +621,18 @@ class StartPage(tk.Frame):
 		else:
 			return selected_names
 
-	def time_frame_updated(self, *args):
-		listbox = self.time_frame_listbox
+	def time_frame_updated(self, listbox):
 
 		selected_time_frame_name = self.get_listbox_value(listbox)[0]
+
+		print(selected_time_frame_name)
 
 		using_custom_time_frame = True if selected_time_frame_name == 'Custom' else False
 		self.toggle_custom_date_input(using_custom_time_frame)
 
 		self.controller.date_bounds = self.get_date_bounds_from_time_frame(selected_time_frame_name)
 
+		# I don't think this line does anything?
 		self.selected_time_frame = selected_time_frame_name
 
 	def get_date_bounds_from_time_frame(self, time_frame_name):
@@ -509,10 +654,18 @@ class StartPage(tk.Frame):
 
 	# Hide/show the custom date input box	
 	def toggle_custom_date_input(self, value):
+		
+		if not self.time_frames:
+			print('No Time Frame')
+			return False
+
 		if value == True:
-			self.custom_time_input_frame.grid(row=1, column=0, padx=10, pady=10, sticky='ne')
+			self.time_frames[0]['custom'].grid(row=1, column=0, padx=10, pady=10, sticky='ne')
+			#self.custom_time_input_frame.grid(row=1, column=0, padx=10, pady=10, sticky='ne')
 		else:
-			self.custom_time_input_frame.grid_forget()
+			
+			self.time_frames[0]['custom'].grid_forget()
+			#self.custom_time_input_frame.grid_forget()
 
 	# Create the frame for the input of custom time bounds.
 	def create_custom_time_input(self):
