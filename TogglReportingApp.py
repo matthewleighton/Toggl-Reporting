@@ -48,6 +48,7 @@ class TogglReportingApp(tk.Tk):
 	def __init__(self, *args, **kwargs):
 		self.connect_to_toggl()
 		self.get_toggl_project_data()
+		self.get_toggl_report_data()
 		self.define_preset_date_bounds()
 		
 		self.group_by = 'Project'
@@ -132,6 +133,30 @@ class TogglReportingApp(tk.Tk):
 
 		return project_list
 
+	def get_toggl_report_data(self):
+
+		date_bounds = {
+				'start': datetime.now() - timedelta(days=365*3),
+				'end': datetime.now()
+			}
+
+		split_bounds = self.split_date_bounds(date_bounds)
+
+		
+
+		# A list of all the reports we gather from Toggl. (Max 1 year each)
+		reports = []
+
+		for bounds in split_bounds:
+			params = {
+				'start': bounds['start'],
+				'end': bounds['end']
+			}
+
+			reports.append(self.get_report(params))
+
+		self.full_toggl_report = self.join_reports(reports)
+
 	def define_preset_date_bounds(self):
 		year = 365
 		month = 30
@@ -176,7 +201,8 @@ class TogglReportingApp(tk.Tk):
 		self.update_client_data()
 		self.update_description_restrictions()
 
-		report = self.get_report_from_toggl()
+		#report = self.get_report_from_toggl()
+		report = self.full_toggl_report
 
 		day = self.get_day()
 		day = self.populate_day(day, report)
@@ -199,6 +225,13 @@ class TogglReportingApp(tk.Tk):
 
 
 	def get_report_from_toggl(self):
+		# TODO: self.date_bounds will be a list of multiple date bounds, instead of just one.
+		# Also -- Instead of getting the report from Toggl here, based on the user's date bounds, we will get the report when the program first opens. Say, a 5 year report.
+		# Then, we can query this report when we apply the user's restrictions, instead of doing multiple requests to Toggl.
+		# In the populate_day function, we will ask each item 'is it within one of the date bounds?'
+		# In theory, the report items should be ordered chronologically. So, if we go past our earliest date bound, we can stop. So we don't need to go through all 5 years of reports if the only date bounds are in the last six months.
+
+
 		# Split the request into several with a max length of one year. (Toggl API only allows reports of max 1 year length)
 		split_bounds = self.split_date_bounds(self.date_bounds)
 
@@ -241,6 +274,8 @@ class TogglReportingApp(tk.Tk):
 				}
 			)
 
+		bounds.reverse() # We reverse the order, because we need reverse-chronological in order to signal when to stop the populate_day function.
+
 		return bounds
 
 	# Return the length of time that a report covers. (In days)
@@ -250,10 +285,6 @@ class TogglReportingApp(tk.Tk):
 
 	# Join the given reports together, saving them as a temporary csv file.
 	def join_reports(self, reports_list):
-		filename = 'test.csv'
-
-		test = ''
-
 		temporary_csv_file = tempfile.NamedTemporaryFile()
 
 		for report in reports_list:
@@ -304,9 +335,23 @@ class TogglReportingApp(tk.Tk):
 
 	# Populate the day dictionary with data from the report.
 	def populate_day(self, day, report):
+		print(self.date_bounds)
+
+		earliest_date_bound = self.date_bounds['start'] #TODO - This will have to be updated to be a function which finds the earliest of ALL our date bounds.
+
+
+
 		with open (report.name, 'r') as file:
 			reader = csv.DictReader(file)
 			for row in reader:
+
+				try:
+					start_date = datetime.strptime(row['Start date'], '%Y-%m-%d')
+				except ValueError:
+					continue
+
+				if start_date < earliest_date_bound: # If the entry is earlier than our earliest date bound, we stop.
+					break
 
 				project 	= row['Project']
 				description = row['Description']
@@ -630,6 +675,7 @@ class StartPage(tk.Frame):
 		using_custom_time_frame = True if selected_time_frame_name == 'Custom' else False
 		self.toggle_custom_date_input(using_custom_time_frame)
 
+		print('Assigning date bounds')
 		self.controller.date_bounds = self.get_date_bounds_from_time_frame(selected_time_frame_name)
 
 		# I don't think this line does anything?
