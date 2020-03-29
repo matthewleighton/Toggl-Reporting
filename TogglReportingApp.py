@@ -592,7 +592,12 @@ class StartPage(tk.Frame):
 
 		default_name = str(len(self.time_frames) + 1)
 
-		entry = Entry(frame, textvariable='')
+		listbox = frame.winfo_children()[0]
+		
+		name = StringVar()
+		name.trace('w', lambda name, index, mode: self.time_frame_updated(listbox))
+
+		entry = Entry(frame, textvariable=name)
 		entry.insert(0, 'Timeframe ' + default_name)
 		entry.grid(row=0, column=1, sticky='w')
 
@@ -614,7 +619,6 @@ class StartPage(tk.Frame):
 
 
 	def create_custom_time_entry(self, container_frame):
-		
 		listbox = container_frame.winfo_children()[0] # TODO: Find a better way to access this listbox than simply quoting the ID.
 		
 		frame = LabelFrame(container_frame, text="Custom Time Frame", padx=10, pady=10)
@@ -672,8 +676,6 @@ class StartPage(tk.Frame):
 			return selected_names
 
 	def time_frame_updated(self, listbox):
-		
-
 		selected_time_frame_name = self.get_listbox_value(listbox)[0]
 
 		using_custom_time_frame = True if selected_time_frame_name == 'Custom' else False
@@ -725,25 +727,7 @@ class StartPage(tk.Frame):
 			self.time_frames[current_timeframe_id-1]['custom'].grid(row=1, column=1, padx=10, pady=10, sticky='nw')
 		else:
 			self.time_frames[current_timeframe_id-1]['custom'].grid_forget()
-
-	# Create the frame for the input of custom time bounds.
-	def create_custom_time_input(self):
-		self.custom_time_input_frame = LabelFrame(self, text="Custom Time Frame", padx=10, pady=10)
-
-		self.start_label = ttk.Label(self.custom_time_input_frame, text="Start Date:")
-		self.start_label.grid(row=0, column=0, padx=10, pady=10)
-
-		self.start_select = DateEntry(self.custom_time_input_frame)
-		self.start_select.grid(row=0, column=1, padx=10, pady=10)
-		self.start_select.bind('<<DateEntrySelected>>', self.time_frame_updated)
-
-		self.end_label = ttk.Label(self.custom_time_input_frame, text="End Date:")
-		self.end_label.grid(row=1, column=0, padx=10, pady=10)
-
-		self.end_select = DateEntry(self.custom_time_input_frame)
-		self.end_select.grid(row=1, column=1, padx=10, pady=10)
-		self.end_select.bind('<<DateEntrySelected>>', self.time_frame_updated)
-
+	
 	def create_projects_frame(self):
 		self.project_selector_frame = LabelFrame(self, text="Projects", padx=10, pady=10)
 
