@@ -53,6 +53,7 @@ class TogglReportingApp(tk.Tk):
 		
 		self.group_by = 'Project'
 		self.description_groupings = []
+		self.date_bounds = {}
 
 
 		tk.Tk.__init__(self, *args, **kwargs)
@@ -136,7 +137,7 @@ class TogglReportingApp(tk.Tk):
 	def get_toggl_report_data(self):
 
 		date_bounds = {
-				'start': datetime.now() - timedelta(days=365*3),
+				'start': datetime.now() - timedelta(days=365*1),
 				'end': datetime.now()
 			}
 
@@ -333,11 +334,27 @@ class TogglReportingApp(tk.Tk):
 
 		return day
 
+	# Return the earliest date from a set of timeframes.
+	def find_earliest_date_bound(self, timeframes):
+		earliest = datetime.today()
+
+		for date_bounds_pair in self.date_bounds.values():
+			start = date_bounds_pair['start']
+
+			if start < earliest:
+				earliest = start
+
+		return earliest
+
 	# Populate the day dictionary with data from the report.
 	def populate_day(self, day, report):
 		print(self.date_bounds)
 
-		earliest_date_bound = self.date_bounds['start'] #TODO - This will have to be updated to be a function which finds the earliest of ALL our date bounds.
+		print(self.date_bounds)
+
+		earliest_date_bound = self.find_earliest_date_bound(self.date_bounds)
+
+		#earliest_date_bound = self.date_bounds['start'] #TODO - This will have to be updated to be a function which finds the earliest of ALL our date bounds.
 
 
 
@@ -346,11 +363,11 @@ class TogglReportingApp(tk.Tk):
 			for row in reader:
 
 				try:
-					start_date = datetime.strptime(row['Start date'], '%Y-%m-%d')
+					entry_date = datetime.strptime(row['Start date'], '%Y-%m-%d')
 				except ValueError:
 					continue
 
-				if start_date < earliest_date_bound: # If the entry is earlier than our earliest date bound, we stop.
+				if entry_date < earliest_date_bound: # If the entry is earlier than our earliest date bound, we stop.
 					break
 
 				project 	= row['Project']
@@ -366,6 +383,24 @@ class TogglReportingApp(tk.Tk):
 
 				if not self.is_included_client(client):
 					continue
+
+				
+
+
+				# Skipping entries which are outside of our date bounds.
+				within_bounds = False
+				for date_bounds_pair in self.date_bounds.values():
+					if date_bounds_pair['start'] <= entry_date <= date_bounds_pair['end']:
+						within_bounds = True
+						break
+
+				if not within_bounds:
+					continue
+
+
+
+
+
 
 				description_match = False
 
@@ -512,22 +547,8 @@ class StartPage(tk.Frame):
 		#self.current_timeframe.set(self.time_frames[0])
 		self.current_timeframe_id.set(1)
 
-		
-		
-		
-
-
-
-		
-
-
 		new_time_frame_button = ttk.Button(time_frame_region, text="New Time Frame", command=self.new_time_frame)
-		new_time_frame_button.grid(row=0, column=2)
-
-
-		#self.time_frames = []
-
-		
+		new_time_frame_button.grid(row=0, column=2)	
 		
 
 	def update_time_frames_dropdown(self):
@@ -566,7 +587,9 @@ class StartPage(tk.Frame):
 		self.current_timeframe_id.set(highest_current_timeframe_id)
 
 
-		print(self.time_frames)
+		#self.controller.time_frames.append()
+
+		#print(self.time_frames)
 
 
 		#self.create_custom_time_input()
@@ -580,7 +603,6 @@ class StartPage(tk.Frame):
 		for i in bounds:
 			listbox.insert(END, i)
 
-		#listbox.bind('<<ListboxSelect>>', lambda: self.time_frame_updated(listbox) )
 		listbox.bind('<<ListboxSelect>>', lambda event: self.time_frame_updated(listbox) )
 
 		listbox.select_set(3)
@@ -630,27 +652,6 @@ class StartPage(tk.Frame):
 
 		current_timeframe['frame'].grid(row=1, column=0)
 
-
-
-	"""
-	# Create the input selector for the time frame.
-	def create_time_frame_listbox(self):
-		self.time_frame_frame = LabelFrame(self, text="Time Frame")
-		self.time_frame_frame.grid(row=1, column=0, padx=10, pady=10, sticky='nw')
-
-		self.time_frame_listbox = Listbox(self.time_frame_frame, selectmode=SINGLE, exportselection=False)
-		self.time_frame_listbox.grid(row=1, column=0, padx=10, pady=10)
-
-		for i in self.controller.preset_date_bounds:
-			self.time_frame_listbox.insert(END, i)
-
-		self.time_frame_listbox.bind('<<ListboxSelect>>', self.time_frame_updated)
-
-		self.time_frame_listbox.select_set(3) # Default to past year. TODO: Shouldn't depend on specific ID.
-
-		self.time_frame_updated()
-	"""
-
 	def get_listbox_value(self, listbox):
 		selected_ids = listbox.curselection()
 
@@ -670,16 +671,16 @@ class StartPage(tk.Frame):
 
 		selected_time_frame_name = self.get_listbox_value(listbox)[0]
 
-		print(selected_time_frame_name)
-
 		using_custom_time_frame = True if selected_time_frame_name == 'Custom' else False
 		self.toggle_custom_date_input(using_custom_time_frame)
 
-		print('Assigning date bounds')
-		self.controller.date_bounds = self.get_date_bounds_from_time_frame(selected_time_frame_name)
+		date_bounds = self.get_date_bounds_from_time_frame(selected_time_frame_name)
 
-		# I don't think this line does anything?
-		self.selected_time_frame = selected_time_frame_name
+		current_timeframe_id = int(self.current_timeframe_id.get())
+
+		self.controller.date_bounds[current_timeframe_id] = date_bounds
+
+		#self.controller.date_bounds = date_bounds
 
 	def get_date_bounds_from_time_frame(self, time_frame_name):
 		number_of_days = self.controller.preset_date_bounds[time_frame_name]
