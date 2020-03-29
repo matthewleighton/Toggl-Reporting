@@ -465,6 +465,13 @@ class TogglReportingApp(tk.Tk):
 
 		return minutes
 
+	def get_minutes_since_midnight(self):
+		now = datetime.now()
+		midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+		minutes = (now - midnight).seconds/60
+
+		return minutes
+
 	def create_graph(self, day):
 		if self.group_by == 'Project':
 			for project_name in day:
@@ -482,7 +489,6 @@ class TogglReportingApp(tk.Tk):
 		elif self.group_by == 'None':
 			plt.plot(list(day.keys()), list(day.values()))
 
-
 		plt.ylabel('Frequency')
 
 		positions = []
@@ -497,6 +503,10 @@ class TogglReportingApp(tk.Tk):
 				time = '0' + time
 
 			labels.append(time)
+
+		if self.highlight_current_time.get():
+			minutes_since_midnight = self.get_minutes_since_midnight()
+			plt.axvline(x=minutes_since_midnight)
 
 		plt.xticks(positions, labels)
 
@@ -519,6 +529,7 @@ class StartPage(tk.Frame):
 		self.create_client_select()
 		self.create_description_search()
 		self.create_more_settings_button()
+		self.create_highlight_current_time_button()
 		self.create_create_graph_button()
 
 	def create_time_frame_controls(self):
@@ -933,6 +944,11 @@ class StartPage(tk.Frame):
 	def create_more_settings_button(self):
 		button = ttk.Button(self, text='More Settings', command=self.display_more_settings)
 		button.grid(row=2, column=0, padx=10, pady=10, sticky='w')
+
+	def create_highlight_current_time_button(self):
+		self.controller.highlight_current_time = IntVar()
+		box = Checkbutton(self, text="Highlight current time", variable=self.controller.highlight_current_time)
+		box.grid(row=2, column=1, padx=10, pady=10, sticky='w')
 
 	def display_more_settings(self):
 		self.settings_window = Toplevel(self)
