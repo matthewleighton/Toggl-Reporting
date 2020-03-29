@@ -570,7 +570,7 @@ class StartPage(tk.Frame):
 
 	def new_time_frame(self):
 		frame = Frame(self)
-		frame.grid(row=1, column=0)
+		frame.grid(row=1, column=0, sticky='nw')
 		bounds =self.controller.preset_date_bounds
 
 		timeframe = {
@@ -598,7 +598,7 @@ class StartPage(tk.Frame):
 	def create_time_frame_listbox(self, frame, bounds):
 
 		listbox = Listbox(frame, selectmode=SINGLE, exportselection=False)
-		listbox.grid(row=1, column=0, padx=10, pady=10)
+		listbox.grid(row=1, column=0, padx=10, pady=10, sticky='nw')
 
 		for i in bounds:
 			listbox.insert(END, i)
@@ -611,8 +611,9 @@ class StartPage(tk.Frame):
 
 
 	def create_custom_time_entry(self, container_frame):
-		print('create_custom_time_entry')
-
+		
+		listbox = container_frame.winfo_children()[0] # TODO: Find a better way to access this listbox than simply quoting the ID.
+		
 		frame = LabelFrame(container_frame, text="Custom Time Frame", padx=10, pady=10)
 
 		start_label = ttk.Label(frame, text="Start Date:")
@@ -620,14 +621,14 @@ class StartPage(tk.Frame):
 
 		start_select = DateEntry(frame)
 		start_select.grid(row=0, column=1, padx=10, pady=10)
-		start_select.bind('<<DateEntrySelected>>', self.time_frame_updated)
+		start_select.bind('<<DateEntrySelected>>', lambda event: self.time_frame_updated(listbox))
 
 		end_label = ttk.Label(frame, text="End Date:")
 		end_label.grid(row=1, column=0, padx=10, pady=10)
 
 		end_select = DateEntry(frame)
 		end_select.grid(row=1, column=1, padx=10, pady=10)
-		end_select.bind('<<DateEntrySelected>>', self.time_frame_updated)
+		end_select.bind('<<DateEntrySelected>>', lambda event: self.time_frame_updated(listbox))
 
 		return frame
 
@@ -668,7 +669,6 @@ class StartPage(tk.Frame):
 			return selected_names
 
 	def time_frame_updated(self, listbox):
-
 		selected_time_frame_name = self.get_listbox_value(listbox)[0]
 
 		using_custom_time_frame = True if selected_time_frame_name == 'Custom' else False
@@ -680,17 +680,24 @@ class StartPage(tk.Frame):
 
 		self.controller.date_bounds[current_timeframe_id] = date_bounds
 
-		#self.controller.date_bounds = date_bounds
-
 	def get_date_bounds_from_time_frame(self, time_frame_name):
-		number_of_days = self.controller.preset_date_bounds[time_frame_name]
-
 		if time_frame_name == 'Custom':
+			current_timeframe_id = int(self.current_timeframe_id.get())
+
+			custom = self.time_frames[current_timeframe_id-1]['custom']
+
+			children = custom.winfo_children()
+
+			start = children[1].get_date()
+			end = children[3].get_date() #TODO - Find a better way to access the date entry elements, instead of quoting their IDs.
+
 			date_bounds = {
-				'start': self.start_select.get_date(),
-				'end': self.end_select.get_date()
+				'start': datetime.combine(start, datetime.min.time()), # We change these to datetimes since we need to compare with Toggl's time
+				'end': datetime.combine(end, datetime.min.time())
 			}
 		else:
+			number_of_days = self.controller.preset_date_bounds[time_frame_name]
+
 			date_bounds = {
 				'start': datetime.now() - timedelta(days=number_of_days),
 				'end': datetime.now()
@@ -701,18 +708,16 @@ class StartPage(tk.Frame):
 
 	# Hide/show the custom date input box	
 	def toggle_custom_date_input(self, value):
-		
 		if not self.time_frames:
 			print('No Time Frame')
 			return False
 
+		current_timeframe_id = int(self.current_timeframe_id.get())
+
 		if value == True:
-			self.time_frames[0]['custom'].grid(row=1, column=0, padx=10, pady=10, sticky='ne')
-			#self.custom_time_input_frame.grid(row=1, column=0, padx=10, pady=10, sticky='ne')
+			self.time_frames[current_timeframe_id-1]['custom'].grid(row=1, column=1, padx=10, pady=10, sticky='nw')
 		else:
-			
-			self.time_frames[0]['custom'].grid_forget()
-			#self.custom_time_input_frame.grid_forget()
+			self.time_frames[current_timeframe_id-1]['custom'].grid_forget()
 
 	# Create the frame for the input of custom time bounds.
 	def create_custom_time_input(self):
