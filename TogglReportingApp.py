@@ -137,13 +137,11 @@ class TogglReportingApp(tk.Tk):
 	def get_toggl_report_data(self):
 
 		date_bounds = {
-				'start': datetime.now() - timedelta(days=365*1),
+				'start': datetime.now() - timedelta(days=365*4),
 				'end': datetime.now()
 			}
 
 		split_bounds = self.split_date_bounds(date_bounds)
-
-		
 
 		# A list of all the reports we gather from Toggl. (Max 1 year each)
 		reports = []
@@ -325,10 +323,12 @@ class TogglReportingApp(tk.Tk):
 		if self.group_by == 'Project':
 			for project in self.project_list:
 				day[project] = emptyDay.copy()
-
 		if self.group_by == 'Description':
 			for grouping in self.description_groupings:
 				day[grouping['title']] = emptyDay.copy()
+		if self.group_by == 'Timeframe':
+			for timeframe in self.date_bounds.values():
+				day[timeframe['name']] = emptyDay.copy()
 		if self.group_by == 'None':
 			day = emptyDay
 
@@ -348,9 +348,6 @@ class TogglReportingApp(tk.Tk):
 
 	# Populate the day dictionary with data from the report.
 	def populate_day(self, day, report):
-		print(self.date_bounds)
-		exit()
-
 		earliest_date_bound = self.find_earliest_date_bound(self.date_bounds)
 
 		with open (report.name, 'r') as file:
@@ -379,26 +376,22 @@ class TogglReportingApp(tk.Tk):
 				if not self.is_included_client(client):
 					continue
 
-				
-
-				print(self.group_by)
-				exit()
-
+				matched_timeframes = []
 
 				# Skipping entries which are outside of our date bounds.
 				within_bounds = False
 				for date_bounds_pair in self.date_bounds.values():
 					if date_bounds_pair['start'] <= entry_date <= date_bounds_pair['end']:
 						within_bounds = True
-						break
+
+						if self.group_by == 'Timeframe':
+							timeframe_name = date_bounds_pair['name']
+							if not timeframe_name in matched_timeframes:
+								matched_timeframes.append(timeframe_name)
+
 
 				if not within_bounds:
 					continue
-
-
-
-
-
 
 				description_match = False
 
@@ -440,6 +433,9 @@ class TogglReportingApp(tk.Tk):
 					elif self.group_by == 'Description':
 						for description_group in matched_description_groups:
 							day[description_group][targetMinute] += 1
+					elif self.group_by == 'Timeframe':
+						for timeframe in matched_timeframes:
+							day[timeframe][targetMinute] += 1
 					elif self.group_by == 'None':
 						day[targetMinute] += 1
 
@@ -480,6 +476,9 @@ class TogglReportingApp(tk.Tk):
 			for grouping in self.description_groupings:
 				title = grouping['title']
 				plt.plot(list(day[title].keys()), list(day[title].values()), label=title)
+		elif self.group_by == 'Timeframe':
+			for timeframe_name in day:
+				plt.plot(list(day[timeframe_name].keys()), list(day[timeframe_name].values()), label=timeframe_name)
 		elif self.group_by == 'None':
 			plt.plot(list(day.keys()), list(day.values()))
 
@@ -591,10 +590,10 @@ class StartPage(tk.Frame):
 		label = ttk.Label(frame, text="Timeframe name: ")
 		label.grid(row=0, column=0, sticky='e')
 
-		timeframe_id = str(len(self.time_frames) + 1)
+		default_name = str(len(self.time_frames) + 1)
 
 		entry = Entry(frame, textvariable='')
-		entry.insert(0, 'Timeframe ' + timeframe_id)
+		entry.insert(0, 'Timeframe ' + default_name)
 		entry.grid(row=0, column=1, sticky='w')
 
 		return entry
@@ -673,6 +672,8 @@ class StartPage(tk.Frame):
 			return selected_names
 
 	def time_frame_updated(self, listbox):
+		
+
 		selected_time_frame_name = self.get_listbox_value(listbox)[0]
 
 		using_custom_time_frame = True if selected_time_frame_name == 'Custom' else False
@@ -685,26 +686,28 @@ class StartPage(tk.Frame):
 		self.controller.date_bounds[current_timeframe_id] = date_bounds
 
 	def get_date_bounds_from_time_frame(self, time_frame_name):
+		current_timeframe_id = int(self.current_timeframe_id.get())
+		timeframe = self.time_frames[current_timeframe_id-1]
+		name = timeframe['name'].get()
+
 		if time_frame_name == 'Custom':
-			current_timeframe_id = int(self.current_timeframe_id.get())
-
-			custom = self.time_frames[current_timeframe_id-1]['custom']
-
-			children = custom.winfo_children()
+			children = timeframe['custom'].winfo_children()
 
 			start = children[1].get_date()
 			end = children[3].get_date() #TODO - Find a better way to access the date entry elements, instead of quoting their IDs.
 
 			date_bounds = {
 				'start': datetime.combine(start, datetime.min.time()), # We change these to datetimes since we need to compare with Toggl's time
-				'end': datetime.combine(end, datetime.min.time())
+				'end': datetime.combine(end, datetime.min.time()),
+				'name': name
 			}
 		else:
 			number_of_days = self.controller.preset_date_bounds[time_frame_name]
 
 			date_bounds = {
 				'start': datetime.now() - timedelta(days=number_of_days),
-				'end': datetime.now()
+				'end': datetime.now(),
+				'name': name
 			}
 
 		return date_bounds
