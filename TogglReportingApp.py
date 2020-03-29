@@ -349,14 +349,9 @@ class TogglReportingApp(tk.Tk):
 	# Populate the day dictionary with data from the report.
 	def populate_day(self, day, report):
 		print(self.date_bounds)
-
-		print(self.date_bounds)
+		exit()
 
 		earliest_date_bound = self.find_earliest_date_bound(self.date_bounds)
-
-		#earliest_date_bound = self.date_bounds['start'] #TODO - This will have to be updated to be a function which finds the earliest of ALL our date bounds.
-
-
 
 		with open (report.name, 'r') as file:
 			reader = csv.DictReader(file)
@@ -385,6 +380,9 @@ class TogglReportingApp(tk.Tk):
 					continue
 
 				
+
+				print(self.group_by)
+				exit()
 
 
 				# Skipping entries which are outside of our date bounds.
@@ -547,8 +545,10 @@ class StartPage(tk.Frame):
 		#self.current_timeframe.set(self.time_frames[0])
 		self.current_timeframe_id.set(1)
 
+
+
 		new_time_frame_button = ttk.Button(time_frame_region, text="New Time Frame", command=self.new_time_frame)
-		new_time_frame_button.grid(row=0, column=2)	
+		new_time_frame_button.grid(row=0, column=3)
 		
 
 	def update_time_frames_dropdown(self):
@@ -576,7 +576,8 @@ class StartPage(tk.Frame):
 		timeframe = {
 			'frame': frame,
 			'preset': self.create_time_frame_listbox(frame, bounds),
-			'custom': self.create_custom_time_entry(frame)
+			'custom': self.create_custom_time_entry(frame),
+			'name': self.create_timeframe_name_entry(frame)
 		}
 
 		self.time_frames.append(timeframe)
@@ -586,14 +587,17 @@ class StartPage(tk.Frame):
 		highest_current_timeframe_id = len(self.time_frames)
 		self.current_timeframe_id.set(highest_current_timeframe_id)
 
+	def create_timeframe_name_entry(self, frame):
+		label = ttk.Label(frame, text="Timeframe name: ")
+		label.grid(row=0, column=0, sticky='e')
 
-		#self.controller.time_frames.append()
+		timeframe_id = str(len(self.time_frames) + 1)
 
-		#print(self.time_frames)
+		entry = Entry(frame, textvariable='')
+		entry.insert(0, 'Timeframe ' + timeframe_id)
+		entry.grid(row=0, column=1, sticky='w')
 
-
-		#self.create_custom_time_input()
-		#self.create_time_frame_listbox()
+		return entry
 
 	def create_time_frame_listbox(self, frame, bounds):
 
@@ -977,7 +981,7 @@ class StartPage(tk.Frame):
 
 		self.group_by_listbox = Listbox(self.group_by_frame, selectmode=SINGLE, exportselection=False)
 
-		group_by_options = ['Project', 'Client', 'Tag', 'Description', 'None']
+		group_by_options = ['Project', 'Client', 'Tag', 'Description', 'Timeframe', 'None']
 
 		for i in group_by_options:
 			self.group_by_listbox.insert(END, i)
